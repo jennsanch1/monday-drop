@@ -93,15 +93,23 @@ function getSectionIcon(title) {
 }
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
-const MARQUEE = 'LIVE WEB RESEARCH · EVERY MONDAY · DROPS AT 8AM · THE LAB STUDIO · POWERED BY CLAUDE · LIVE WEB RESEARCH · EVERY MONDAY · DROPS AT 8AM · THE LAB STUDIO · POWERED BY CLAUDE · ';
-const SCAN_STEPS = [
-  'Scanning client industry news...',
-  'Monitoring design trend signals...',
-  'Checking competitor studio moves...',
-  'Pulling Awwwards & Behance highlights...',
-  'Cross-referencing active project list...',
-  'Writing this week\'s intelligence drop...',
-];
+function getScanSteps() {
+  return (state.perplexityKey && !state.demoMode) ? [
+    'Connecting to Perplexity search engine...',
+    'Researching clients + design signals...',
+    'Analyzing competitor studio moves...',
+    'Cross-referencing active client context...',
+    'Synthesizing intelligence with Claude AI...',
+    'Formatting your Monday Drop...',
+  ] : [
+    'Scanning client industry news...',
+    'Monitoring design trend signals...',
+    'Checking competitor studio moves...',
+    'Pulling Awwwards & Behance highlights...',
+    'Cross-referencing active project list...',
+    'Writing this week\'s intelligence drop...',
+  ];
+}
 const DEFAULT_CLIENTS = [
   {id:1,name:'Twilio',industry:'Cloud Communications'},
   {id:2,name:'DigitalOcean',industry:'Developer Cloud'},
@@ -114,8 +122,11 @@ const CLIENT_ACCENTS = [C.blue,C.teal,C.purple,'#7089ba','#f06a35','#fac666'];
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
 let state = {
-  apiKey:        localStorage.getItem('lab_mid_key') || '',
-  demoMode:      false,
+  apiKey:          localStorage.getItem('lab_mid_key') || '',
+  perplexityKey:   localStorage.getItem('lab_pplx_key') || '',
+  liveSignals:     null,
+  perplexitySubLines: [],
+  demoMode:        false,
   clients:       DEFAULT_CLIENTS.map(c=>({...c})),
   newClient:     {name:'',industry:''},
   addingClient:  false,
@@ -243,8 +254,52 @@ Bring this up with **New Relic**: Datadog just released a major UI overhaul that
 
 **Cursor + Figma MCP integration** — a new plugin released this week lets Cursor read Figma files directly and generate component code that matches your design tokens. For studios doing design-to-code handoff, this cuts the implementation gap significantly. The Lab should test it on one small component this week before rolling it out to client projects.`;
 
+// ─── PERPLEXITY ───────────────────────────────────────────────────────────────
+async function callPerplexity() {
+  const clientList = state.clients.map(c=>`${c.name} (${c.industry})`).join(', ');
+  const res = await fetch('https://api.perplexity.ai/chat/completions', {
+    method:'POST',
+    headers:{'Authorization':`Bearer ${state.perplexityKey}`,'Content-Type':'application/json'},
+    body: JSON.stringify({
+      model:'sonar',
+      messages:[{role:'user',content:`You are a research agent for a creative design studio. Find the most important news from the past 7 days for these clients and for the design industry.
+
+Clients: ${clientList}
+
+Find:
+1. 1-2 key news items per client (product launches, funding, leadership changes, strategic moves)
+2. 3 notable design or tech trend stories this week worth a creative studio knowing
+
+Return ONLY valid JSON, no other text:
+{"clientNews":[{"company":"name","headline":"...","source":"outlet","daysAgo":N,"brief":"1 sentence"}],"designSignals":[{"headline":"...","source":"outlet","daysAgo":N,"brief":"1 sentence"}]}`}],
+      search_recency_filter:'week',
+    }),
+  });
+  if (!res.ok) throw new Error(`Perplexity error: ${res.status} ${res.statusText}`);
+  const data = await res.json();
+  const txt = data.choices?.[0]?.message?.content || '{}';
+  try {
+    const m = txt.match(/\{[\s\S]*\}/);
+    return m ? JSON.parse(m[0]) : {clientNews:[],designSignals:[]};
+  } catch(e) { return {clientNews:[],designSignals:[]}; }
+}
+
+function formatPerplexityContext(signals) {
+  if (!signals) return '';
+  let out = 'LIVE RESEARCH DATA from Perplexity (past 7 days) — use as primary factual foundation:\n\n';
+  if (signals.clientNews?.length) {
+    out += 'CLIENT NEWS:\n';
+    signals.clientNews.forEach(n=>{out+=`• ${n.company}: ${n.headline} (${n.source}, ${n.daysAgo===0?'today':n.daysAgo===1?'yesterday':n.daysAgo+' days ago'}) — ${n.brief}\n`;});
+  }
+  if (signals.designSignals?.length) {
+    out += '\nDESIGN & INDUSTRY SIGNALS:\n';
+    signals.designSignals.forEach(n=>{out+=`• ${n.headline} (${n.source}, ${n.daysAgo===0?'today':n.daysAgo===1?'yesterday':n.daysAgo+' days ago'}) — ${n.brief}\n`;});
+  }
+  return out;
+}
+
 // ─── API ──────────────────────────────────────────────────────────────────────
-async function callApi(apiKey, clients, focus) {
+async function callApi(apiKey, clients, focus, pxContext='') {
   const clientList = clients.map(c=>`${c.name} (${c.industry})`).join(', ');
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method:'POST',
@@ -256,8 +311,8 @@ async function callApi(apiKey, clients, focus) {
 ACTIVE CLIENTS: ${clientList}
 STUDIO FOCUS THIS WEEK: ${focus||'General awareness across all clients and active projects'}
 TODAY: ${getTodayFull()}
-
-Use web search to find REAL, CURRENT information from the past 7–14 days. Research:
+${pxContext?'\n'+pxContext+'\n':''}
+${pxContext?'Use the live research data above as your primary factual foundation. Expand on it with your knowledge but ground every claim in what was found.':'Use web search to find REAL, CURRENT information from the past 7–14 days.'} Research:
 1. Specific news in each client's industry — funding, product launches, leadership changes, regulatory moves
 2. Design trends showing up in production this week — visual language, interaction patterns, notable launches
 3. Brand or campaign moves by companies adjacent to these clients
@@ -282,7 +337,7 @@ A single specific talking point — based on real news — that positions the st
 The most relevant AI or design tool update from this week.
 
 Be specific. Real names. Real news. Real relevance. No filler.`}],
-      tools:[{type:'web_search_20250305',name:'web_search'}],
+      ...(pxContext ? {} : {tools:[{type:'web_search_20250305',name:'web_search'}]}),
     }),
   });
   const data = await res.json();
@@ -419,6 +474,43 @@ function renderGenericBody(body) {
     body.split('\n').map(l=>`<div style="margin-bottom:4px;">${parseMd(l)||'&nbsp;'}</div>`).join('')+`</div>`;
 }
 
+// ─── LIVE SIGNALS CARD ────────────────────────────────────────────────────────
+function renderLiveSignals() {
+  const s = state.liveSignals;
+  if (!s) return '';
+  const all = [...(s.clientNews||[]),...(s.designSignals||[])];
+  if (!all.length) return '';
+  const total = all.length;
+  return `
+    <div style="background:${C.card};border:1px solid rgba(0,153,255,0.2);border-radius:8px;overflow:hidden;margin-bottom:10px;animation:fadeInUp 0.5s ease forwards;opacity:0;">
+      <div style="padding:12px 20px;border-bottom:1px solid rgba(0,153,255,0.1);display:flex;align-items:center;justify-content:space-between;background:rgba(0,153,255,0.03);">
+        <div style="display:flex;align-items:center;gap:9px;">
+          <span style="font-size:14px;">🔎</span>
+          <span style="font-family:${GM};font-size:9px;font-weight:500;letter-spacing:0.14em;color:${C.dim};">LIVE SIGNALS</span>
+          <span style="background:rgba(0,153,255,0.12);color:${C.blue};padding:2px 8px;border-radius:100px;font-family:${GM};font-size:8px;letter-spacing:0.1em;">PERPLEXITY · ${total} SOURCES · THIS WEEK</span>
+        </div>
+        <span style="font-family:${GM};font-size:9px;color:${C.dim};">past 7 days</span>
+      </div>
+      <div style="padding:14px 20px;display:flex;flex-direction:column;gap:8px;">
+        ${all.map((item,i)=>{
+          const isDesign = i >= (s.clientNews||[]).length;
+          const borderColor = isDesign ? C.teal : C.blue;
+          const bgColor = isDesign ? 'rgba(0,230,197,0.03)' : 'rgba(0,153,255,0.03)';
+          const tagColor = isDesign ? C.teal : C.blue;
+          const daysLabel = item.daysAgo===0?'today':item.daysAgo===1?'yesterday':item.daysAgo+' days ago';
+          return `<div style="border-left:2px solid ${borderColor};padding:8px 12px;background:${bgColor};border-radius:0 6px 6px 0;animation:fadeInUp 0.4s ease ${i*50}ms both;">
+            <div style="font-family:${GF};font-size:12.5px;color:rgba(255,255,255,0.85);line-height:1.4;margin-bottom:4px;">${esc(item.headline)}</div>
+            <div style="display:flex;gap:8px;font-family:${GM};font-size:9px;color:${C.dim};">
+              ${item.source?`<span>${esc(item.source)}</span><span>·</span>`:''}
+              <span>${daysLabel}</span>
+              ${item.company?`<span>·</span><span style="color:${tagColor};">${esc(item.company)}</span>`:''}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
 // ─── REPORT CARD ──────────────────────────────────────────────────────────────
 function renderReportCard(title, body, delay) {
   const svgIcon = getSectionIcon(title);
@@ -485,21 +577,29 @@ function renderBentoGrid(sections) {
 
 function renderSectionsWithBento(sections) {
   const bentoSet=new Set(['WHAT COMPETITORS ARE DOING','ONE THING TO BRING UP WITH A CLIENT THIS WEEK','STUDIO TOOL ALERT']);
-  return sections.filter(s=>!bentoSet.has(s.title)).map((s,i)=>renderReportCard(s.title,s.body,i*70)).join('')+
+  return renderLiveSignals()+
+    sections.filter(s=>!bentoSet.has(s.title)).map((s,i)=>renderReportCard(s.title,s.body,i*70)).join('')+
     (sections.filter(s=>bentoSet.has(s.title)).length?renderBentoGrid(sections.filter(s=>bentoSet.has(s.title))):'');
 }
 
 // ─── SCAN LOG ─────────────────────────────────────────────────────────────────
 function renderScanLog() {
-  const rows=SCAN_STEPS.map((s,i)=>{
+  const steps=getScanSteps();
+  const isPplx=state.perplexityKey&&!state.demoMode;
+  const rows=steps.map((s,i)=>{
     const done=i<state.step-1,active=i===state.step-1;
-    return `<div class="scan-step" style="display:flex;align-items:center;gap:14px;padding:12px 20px;${i<SCAN_STEPS.length-1?`border-bottom:1px solid ${C.border}`:''}">
-      <span class="step-icon${active?' scan-blink':''}" style="font-size:14px;width:18px;text-align:center;color:${done?C.teal:active?'#fff':C.dim};">${done?'✓':active?'◎':'○'}</span>
-      <div style="flex:1;">
-        <span style="font-family:${GF};font-size:13px;color:${done||active?'#fff':C.dim};font-weight:${active?500:400};">${esc(s)}</span>
-        ${active?`<div style="height:1px;background:${C.border};border-radius:1px;margin-top:8px;overflow:hidden;"><div style="height:100%;background:${C.blue};border-radius:1px;animation:progressBar 0.7s ease forwards;"></div></div>`:''}
+    const showPplxTag=isPplx&&i<2;
+    const subLines=showPplxTag&&done&&state.perplexitySubLines.length?state.perplexitySubLines:[];
+    return `<div class="scan-step" style="display:flex;flex-direction:column;padding:12px 20px;${i<steps.length-1?`border-bottom:1px solid ${C.border}`:''}">
+      <div style="display:flex;align-items:center;gap:14px;">
+        <span class="step-icon${active?' scan-blink':''}" style="font-size:14px;width:18px;text-align:center;color:${done?C.teal:active?'#fff':C.dim};">${done?'✓':active?'◎':'○'}</span>
+        <div style="flex:1;">
+          <span style="font-family:${GF};font-size:13px;color:${done||active?'#fff':C.dim};font-weight:${active?500:400};">${showPplxTag?`<span style="color:${C.blue};font-weight:500;">[Perplexity]</span> `:''}${esc(s)}</span>
+          ${active?`<div style="height:1px;background:${C.border};border-radius:1px;margin-top:8px;overflow:hidden;"><div style="height:100%;background:${C.blue};border-radius:1px;animation:progressBar 0.7s ease forwards;"></div></div>`:''}
+        </div>
+        ${done?`<span style="font-family:${GM};font-size:9px;letter-spacing:0.12em;color:${C.teal};background:rgba(0,230,197,0.08);padding:2px 8px;border-radius:100px;">DONE</span>`:''}
       </div>
-      ${done?`<span style="font-family:${GM};font-size:9px;letter-spacing:0.12em;color:${C.teal};background:rgba(0,230,197,0.08);padding:2px 8px;border-radius:100px;">DONE</span>`:''}
+      ${subLines.length?`<div style="margin-top:6px;padding-left:32px;display:flex;flex-direction:column;gap:3px;">${subLines.map(l=>`<div style="font-family:${GM};font-size:9px;color:rgba(0,230,197,0.65);">› ${esc(l)}</div>`).join('')}</div>`:''}
     </div>`;
   }).join('');
   return `<div class="fu" style="background:${C.card};border:1px solid ${C.border};border-radius:8px;overflow:hidden;margin-top:18px;">
@@ -794,10 +894,21 @@ function renderSetup() {
         </div>
         <div style="font-family:'Geist',sans-serif;font-weight:700;font-size:32px;line-height:1;letter-spacing:-0.03em;color:#fff;margin-bottom:4px;">Monday</div>
         <div style="font-family:'Geist',sans-serif;font-weight:700;font-size:32px;line-height:1;letter-spacing:-0.03em;color:${C.muted};margin-bottom:24px;">Intelligence Drop</div>
-        <p style="font-family:${GF};font-size:13.5px;color:${C.muted};line-height:1.65;margin-bottom:24px;">Enter your Anthropic API key to enable real-time web research. Stored locally, never shared.</p>
+        <p style="font-family:${GF};font-size:13.5px;color:${C.muted};line-height:1.65;margin-bottom:20px;">Enter your Anthropic API key to enable real-time research. Stored locally, never shared.</p>
+        <div style="font-family:${GM};font-size:9px;letter-spacing:0.12em;color:${C.dim};margin-bottom:6px;text-transform:uppercase;">Anthropic API Key <span style="color:rgba(248,113,113,0.8);margin-left:4px;">REQUIRED</span></div>
         <input id="api-key-input" type="password" placeholder="sk-ant-api03-..."
           style="width:100%;padding:11px 14px;border:1px solid ${C.border};border-radius:6px;font-family:${GM};font-size:12px;background:${C.surface};color:#fff;margin-bottom:10px;transition:all 0.15s;" />
         <div id="api-key-error" style="font-family:${GF};font-size:11px;color:#f87171;margin-bottom:10px;display:none;"></div>
+        <div style="border-top:1px solid ${C.border};margin:16px 0 14px;"></div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <span style="font-family:${GM};font-size:9px;letter-spacing:0.12em;color:${C.dim};text-transform:uppercase;">Perplexity API Key</span>
+          <span style="background:rgba(0,153,255,0.12);color:${C.blue};padding:2px 7px;border-radius:100px;font-family:${GM};font-size:7px;letter-spacing:0.1em;">OPTIONAL</span>
+          <span style="background:rgba(0,230,197,0.1);color:${C.teal};padding:2px 7px;border-radius:100px;font-family:${GM};font-size:7px;letter-spacing:0.1em;">✦ ENHANCED</span>
+        </div>
+        <input id="pplx-key-input" type="password" placeholder="pplx-..."
+          value="${esc(state.perplexityKey)}"
+          style="width:100%;padding:11px 14px;border:1px solid rgba(0,153,255,0.2);border-radius:6px;font-family:${GM};font-size:12px;background:rgba(0,153,255,0.04);color:#fff;margin-bottom:6px;transition:all 0.15s;" />
+        <div style="font-family:${GF};font-size:11px;color:${C.dim};line-height:1.5;margin-bottom:16px;">Searches the live web before each drop — real client news + design signals fed directly to Claude. Faster and more accurate.</div>
         <button id="activate-btn" class="run-btn"
           style="width:100%;padding:12px;background:${C.blue};color:#fff;border:none;border-radius:6px;font-family:${GF};font-size:13px;font-weight:600;cursor:pointer;margin-bottom:10px;">
           Activate Intelligence Drop →
@@ -829,6 +940,7 @@ function renderMain() {
         ${state.phase==='running'?`<div style="display:flex;align-items:center;gap:6px;"><div class="pulse-dot" style="width:6px;height:6px;border-radius:50%;background:${C.blue};"></div><span style="font-family:${GM};font-size:9px;letter-spacing:0.12em;color:${C.dim};">SCANNING</span></div>`:''}
         ${state.phase==='done'?`<div style="display:flex;align-items:center;gap:6px;"><div style="width:6px;height:6px;border-radius:50%;background:${C.teal};"></div><span style="font-family:${GM};font-size:9px;letter-spacing:0.12em;color:${C.dim};">READY</span></div>`:''}
         ${state.demoMode?`<span style="font-family:${GM};font-size:9px;color:${C.purple};background:rgba(216,92,224,0.1);padding:3px 10px;border-radius:100px;">DEMO</span>`:''}
+        ${state.perplexityKey&&!state.demoMode?`<div style="display:flex;align-items:center;gap:5px;background:rgba(0,153,255,0.08);border:1px solid rgba(0,153,255,0.2);border-radius:100px;padding:3px 10px;"><div class="pulse-dot" style="width:4px;height:4px;border-radius:50%;background:${C.blue};"></div><span style="font-family:${GM};font-size:8px;letter-spacing:0.1em;color:${C.blue};">PERPLEXITY</span></div>`:''}
         ${state.history.length>0?`
         <button id="history-btn" style="background:none;border:1px solid ${C.border};border-radius:100px;padding:4px 10px;color:${C.dim};cursor:pointer;font-family:${GM};font-size:9px;letter-spacing:0.1em;display:flex;align-items:center;gap:5px;transition:all 0.15s ease;" onmouseover="this.style.color='#fff';this.style.borderColor='rgba(255,255,255,0.2)'" onmouseout="this.style.color='${C.dim}';this.style.borderColor='${C.border}'">
           <span style="display:flex;">${ICON_HISTORY}</span> ${state.history.length}
@@ -839,9 +951,6 @@ function renderMain() {
       </div>
     </div>
 
-    <div style="background:${C.surface};overflow:hidden;border-bottom:1px solid ${C.border};padding:8px 0;">
-      <div style="display:inline-block;white-space:nowrap;animation:ticker 32s linear infinite;font-family:${GM};font-size:9px;font-weight:500;letter-spacing:0.2em;color:${C.dim};">${MARQUEE+MARQUEE}</div>
-    </div>
 
     <div style="max-width:800px;margin:0 auto;padding:60px 40px 100px;">
 
@@ -888,7 +997,10 @@ function renderMain() {
         <button id="run-btn" class="run-btn" ${!state.clients.length?'disabled':''}
           style="width:100%;padding:18px 28px;background:${state.clients.length?C.blue:C.surface};color:${state.clients.length?'#fff':C.dim};border:none;border-radius:8px;font-family:${GF};font-size:15px;font-weight:600;cursor:${state.clients.length?'pointer':'not-allowed'};display:flex;align-items:center;justify-content:space-between;">
           <span>▶  Run this week's drop</span>
-          <span style="font-family:${GM};font-size:10px;font-weight:400;color:rgba(255,255,255,0.6);">${state.clients.length} clients · live web search</span>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-family:${GM};font-size:10px;font-weight:400;color:rgba(255,255,255,0.5);">${state.clients.length} clients</span>
+            ${state.perplexityKey&&!state.demoMode?`<span style="font-family:${GM};font-size:9px;font-weight:500;color:rgba(255,255,255,0.8);background:rgba(255,255,255,0.1);padding:2px 8px;border-radius:100px;">⚡ Perplexity + Claude</span>`:`<span style="font-family:${GM};font-size:10px;font-weight:400;color:rgba(255,255,255,0.5);">· live web search</span>`}
+          </div>
         </button>
         <div style="margin-top:8px;text-align:center;font-family:${GF};font-size:12px;color:${C.dim};">Typically takes 20–40 seconds</div>
       </div>`:''}
@@ -912,7 +1024,7 @@ function renderMain() {
         <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;">
           <div>
             <div style="font-family:'Geist',sans-serif;font-size:22px;font-weight:700;letter-spacing:-0.03em;color:#fff;">This week's drop</div>
-            <div style="font-family:${GF};font-size:12px;color:${C.dim};margin-top:3px;">${sections.length} sections · live research · ${state.clients.length} clients</div>
+            <div style="font-family:${GF};font-size:12px;color:${C.dim};margin-top:3px;">${sections.length} sections · ${state.liveSignals?`Perplexity + Claude · ${[...(state.liveSignals.clientNews||[]),...(state.liveSignals.designSignals||[])].length} live sources · `:'live research · '}${state.clients.length} clients</div>
           </div>
           <button id="reset-btn" class="ghost-btn" style="padding:8px 18px;background:transparent;border:1px solid ${C.border};border-radius:6px;font-family:${GF};font-size:12px;color:${C.dim};cursor:pointer;">↺ Run again</button>
         </div>
@@ -943,7 +1055,10 @@ function bindSetup() {
   const save=()=>{
     const key=input.value.trim();
     if(!key.startsWith('sk-ant-')){errEl.textContent='Must start with sk-ant-';errEl.style.display='block';input.style.borderColor='rgba(248,113,113,0.5)';return;}
-    localStorage.setItem('lab_mid_key',key);state.apiKey=key;render();
+    localStorage.setItem('lab_mid_key',key);state.apiKey=key;
+    const pplxInput=document.getElementById('pplx-key-input');
+    if(pplxInput){const pk=pplxInput.value.trim();if(pk){localStorage.setItem('lab_pplx_key',pk);state.perplexityKey=pk;}}
+    render();
   };
   input.addEventListener('keydown',e=>{if(e.key==='Enter')save();});
   input.addEventListener('input',()=>{errEl.style.display='none';input.style.borderColor=C.border;});
@@ -1067,9 +1182,8 @@ function doAddClient() {
 // ─── RUN ──────────────────────────────────────────────────────────────────────
 async function runDrop() {
   if(!state.clients.length)return;
-  state.phase='running';state.report='';state.error='';state.step=0;render();
+  state.phase='running';state.report='';state.error='';state.step=0;state.liveSignals=null;state.perplexitySubLines=[];render();
 
-  // Elapsed timer
   let elapsed=0;
   const timerInterval=setInterval(()=>{
     elapsed++;
@@ -1077,17 +1191,41 @@ async function runDrop() {
     if(el)el.textContent=`${elapsed}s`;
   },1000);
 
-  const stepThrough=async()=>{
-    for(let i=1;i<=SCAN_STEPS.length;i++){
-      state.step=i;updateScanLog();
-      await new Promise(r=>setTimeout(r,680));
-    }
-  };
   try {
+    let pxContext='';
+
+    // Phase 1: Perplexity research (if key set and not demo)
+    if(state.perplexityKey&&!state.demoMode){
+      state.step=1;updateScanLog();
+      await new Promise(r=>setTimeout(r,400));
+      state.step=2;updateScanLog();
+      const signals=await callPerplexity();
+      state.liveSignals=signals;
+      pxContext=formatPerplexityContext(signals);
+      // Build sub-lines for scan log display
+      const subLines=[];
+      (signals.clientNews||[]).slice(0,3).forEach(n=>subLines.push(`${n.company}: ${n.headline.slice(0,60)}${n.headline.length>60?'…':''}`));
+      (signals.designSignals||[]).slice(0,1).forEach(n=>subLines.push(`Design: ${n.headline.slice(0,55)}${n.headline.length>55?'…':''}`));
+      state.perplexitySubLines=subLines;
+      render(); // re-render to show sub-lines
+      await new Promise(r=>setTimeout(r,500));
+    }
+
+    // Phase 2: remaining steps + Claude in parallel
+    const steps=getScanSteps();
+    const startStep=state.perplexityKey&&!state.demoMode?3:1;
+    const stepThrough=async()=>{
+      for(let i=startStep;i<=steps.length;i++){
+        state.step=i;updateScanLog();
+        await new Promise(r=>setTimeout(r,780));
+      }
+    };
+
     const [result]=await Promise.all([
-      state.demoMode?Promise.resolve(DEMO_REPORT):callApi(state.apiKey,state.clients,state.focus),
+      state.demoMode?Promise.resolve(DEMO_REPORT):callApi(state.apiKey,state.clients,state.focus,pxContext),
       stepThrough(),
     ]);
+
     clearInterval(timerInterval);
     state.report=result;state.phase='done';
     saveHistory(result);
@@ -1101,7 +1239,7 @@ async function runDrop() {
 function updateScanLog() {
   const stepEls=document.querySelectorAll('.scan-step');
   if(!stepEls.length)return;
-  SCAN_STEPS.forEach((_,i)=>{
+  getScanSteps().forEach((_,i)=>{
     const el=stepEls[i];if(!el)return;
     const done=i<state.step-1,active=i===state.step-1;
     const icon=el.querySelector('.step-icon');
