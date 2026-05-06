@@ -94,7 +94,7 @@ function getSectionIcon(title) {
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 function getScanSteps() {
-  return (state.perplexityKey && !state.demoMode) ? [
+  return (state.perplexityKey || state.demoMode) ? [
     'Connecting to Perplexity search engine...',
     'Researching clients + design signals...',
     'Analyzing competitor studio moves...',
@@ -110,6 +110,20 @@ function getScanSteps() {
     'Writing this week\'s intelligence drop...',
   ];
 }
+
+const DEMO_SIGNALS = {
+  clientNews: [
+    {company:'Twilio',headline:'Twilio announces CustomerAI expansion — deeper OpenAI integration for voice agents',source:'TechCrunch',daysAgo:2,brief:'Brands can now build voice agents directly on Twilio without a separate orchestration layer.'},
+    {company:'DigitalOcean',headline:'DigitalOcean launches Managed Kafka, signals enterprise market push',source:'VentureBeat',daysAgo:1,brief:'Their most enterprise-facing product yet — a clear move upmarket beyond indie developers.'},
+    {company:'New Relic',headline:'New Relic releases AI Monitoring out of beta — LLM token cost tracking live',source:'InfoQ',daysAgo:3,brief:'Now surfaces LLM token costs, response latency, and hallucination rate inside standard dashboards.'},
+    {company:'Zscaler',headline:'Zscaler CEO: "Zero trust for AI" keynote at RSA Conference reframes platform',source:'CRN',daysAgo:4,brief:'Big narrative shift — moving from secure internet access to AI security infrastructure.'},
+  ],
+  designSignals: [
+    {headline:'"Bento grid" layouts peak — Stripe, Notion, Linear all adopt asymmetric bento',source:'Webflow Blog',daysAgo:2,brief:'Worth proposing for any client landing page refresh in Q2.'},
+    {headline:'Vercel ships new dashboard — monospace metrics, card-dense information hierarchy',source:'Vercel',daysAgo:1,brief:'Monospace type for metric values is showing up everywhere in dev-tool UI right now.'},
+    {headline:'Fantasy Interactive Spotify redesign concept gets heavy Dribbble traction',source:'Dribbble',daysAgo:3,brief:'Audio waveforms as primary visual motif — influencing brand-led product design thinking.'},
+  ],
+};
 const DEFAULT_CLIENTS = [
   {id:1,name:'Twilio',industry:'Cloud Communications'},
   {id:2,name:'DigitalOcean',industry:'Developer Cloud'},
@@ -585,10 +599,10 @@ function renderSectionsWithBento(sections) {
 // ─── SCAN LOG ─────────────────────────────────────────────────────────────────
 function renderScanLog() {
   const steps=getScanSteps();
-  const isPplx=state.perplexityKey&&!state.demoMode;
+  const isPplx=state.perplexityKey||state.demoMode;
   const rows=steps.map((s,i)=>{
     const done=i<state.step-1,active=i===state.step-1;
-    const showPplxTag=isPplx&&i<2;
+    const showPplxTag=(isPplx||state.demoMode)&&i<2;
     const subLines=showPplxTag&&done&&state.perplexitySubLines.length?state.perplexitySubLines:[];
     return `<div class="scan-step" style="display:flex;flex-direction:column;padding:12px 20px;${i<steps.length-1?`border-bottom:1px solid ${C.border}`:''}">
       <div style="display:flex;align-items:center;gap:14px;">
@@ -894,12 +908,26 @@ function renderSetup() {
         </div>
         <div style="font-family:'Geist',sans-serif;font-weight:700;font-size:32px;line-height:1;letter-spacing:-0.03em;color:#fff;margin-bottom:4px;">Monday</div>
         <div style="font-family:'Geist',sans-serif;font-weight:700;font-size:32px;line-height:1;letter-spacing:-0.03em;color:${C.muted};margin-bottom:24px;">Intelligence Drop</div>
-        <p style="font-family:${GF};font-size:13.5px;color:${C.muted};line-height:1.65;margin-bottom:20px;">Enter your Anthropic API key to enable real-time research. Stored locally, never shared.</p>
+        <!-- DEMO MODE — top, clear path -->
+        <button id="demo-btn" style="width:100%;padding:13px;background:rgba(216,92,224,0.08);border:1px solid rgba(216,92,224,0.25);border-radius:8px;font-family:${GF};font-size:13px;font-weight:600;color:#d85ce0;cursor:pointer;margin-bottom:6px;transition:all 0.15s ease;display:flex;align-items:center;justify-content:center;gap:8px;"
+          onmouseover="this.style.background='rgba(216,92,224,0.14)';this.style.borderColor='rgba(216,92,224,0.4)';"
+          onmouseout="this.style.background='rgba(216,92,224,0.08)';this.style.borderColor='rgba(216,92,224,0.25)';">
+          <span style="font-size:15px;">▶</span> Try Demo Mode — no API key needed
+        </button>
+        <div style="font-family:${GF};font-size:11px;color:${C.dim};text-align:center;margin-bottom:20px;">Explore the full interface with sample data instantly</div>
+
+        <!-- DIVIDER -->
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+          <div style="flex:1;height:1px;background:${C.border};"></div>
+          <span style="font-family:${GM};font-size:9px;letter-spacing:0.12em;color:${C.dim};">OR CONNECT YOUR KEYS</span>
+          <div style="flex:1;height:1px;background:${C.border};"></div>
+        </div>
+
+        <!-- API KEYS -->
         <div style="font-family:${GM};font-size:9px;letter-spacing:0.12em;color:${C.dim};margin-bottom:6px;text-transform:uppercase;">Anthropic API Key <span style="color:rgba(248,113,113,0.8);margin-left:4px;">REQUIRED</span></div>
         <input id="api-key-input" type="password" placeholder="sk-ant-api03-..."
           style="width:100%;padding:11px 14px;border:1px solid ${C.border};border-radius:6px;font-family:${GM};font-size:12px;background:${C.surface};color:#fff;margin-bottom:10px;transition:all 0.15s;" />
         <div id="api-key-error" style="font-family:${GF};font-size:11px;color:#f87171;margin-bottom:10px;display:none;"></div>
-        <div style="border-top:1px solid ${C.border};margin:16px 0 14px;"></div>
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
           <span style="font-family:${GM};font-size:9px;letter-spacing:0.12em;color:${C.dim};text-transform:uppercase;">Perplexity API Key</span>
           <span style="background:rgba(0,153,255,0.12);color:${C.blue};padding:2px 7px;border-radius:100px;font-family:${GM};font-size:7px;letter-spacing:0.1em;">OPTIONAL</span>
@@ -908,16 +936,10 @@ function renderSetup() {
         <input id="pplx-key-input" type="password" placeholder="pplx-..."
           value="${esc(state.perplexityKey)}"
           style="width:100%;padding:11px 14px;border:1px solid rgba(0,153,255,0.2);border-radius:6px;font-family:${GM};font-size:12px;background:rgba(0,153,255,0.04);color:#fff;margin-bottom:6px;transition:all 0.15s;" />
-        <div style="font-family:${GF};font-size:11px;color:${C.dim};line-height:1.5;margin-bottom:16px;">Searches the live web before each drop — real client news + design signals fed directly to Claude. Faster and more accurate.</div>
+        <div style="font-family:${GF};font-size:11px;color:${C.dim};line-height:1.5;margin-bottom:16px;">Searches the live web before each drop — real client news + design signals fed directly to Claude.</div>
         <button id="activate-btn" class="run-btn"
-          style="width:100%;padding:12px;background:${C.blue};color:#fff;border:none;border-radius:6px;font-family:${GF};font-size:13px;font-weight:600;cursor:pointer;margin-bottom:10px;">
+          style="width:100%;padding:12px;background:${C.blue};color:#fff;border:none;border-radius:6px;font-family:${GF};font-size:13px;font-weight:600;cursor:pointer;">
           Activate Intelligence Drop →
-        </button>
-        <button id="demo-btn"
-          style="width:100%;padding:11px;background:transparent;border:1px solid ${C.border};border-radius:6px;font-family:${GF};font-size:13px;font-weight:500;color:${C.muted};cursor:pointer;transition:all 0.15s ease;"
-          onmouseover="this.style.borderColor='rgba(255,255,255,0.2)';this.style.color='#fff';"
-          onmouseout="this.style.borderColor='${C.border}';this.style.color='${C.muted}';">
-          Try Demo Mode — no API key needed
         </button>
       </div>
     </div>`;
@@ -1194,14 +1216,20 @@ async function runDrop() {
   try {
     let pxContext='';
 
-    // Phase 1: Perplexity research (if key set and not demo)
-    if(state.perplexityKey&&!state.demoMode){
+    // Phase 1: Perplexity research (real or demo simulation)
+    if(state.perplexityKey||state.demoMode){
       state.step=1;updateScanLog();
-      await new Promise(r=>setTimeout(r,400));
+      await new Promise(r=>setTimeout(r,600));
       state.step=2;updateScanLog();
-      const signals=await callPerplexity();
+      let signals;
+      if(state.demoMode){
+        await new Promise(r=>setTimeout(r,900)); // simulate search time
+        signals=DEMO_SIGNALS;
+      } else {
+        signals=await callPerplexity();
+        pxContext=formatPerplexityContext(signals);
+      }
       state.liveSignals=signals;
-      pxContext=formatPerplexityContext(signals);
       // Build sub-lines for scan log display
       const subLines=[];
       (signals.clientNews||[]).slice(0,3).forEach(n=>subLines.push(`${n.company}: ${n.headline.slice(0,60)}${n.headline.length>60?'…':''}`));
@@ -1213,7 +1241,7 @@ async function runDrop() {
 
     // Phase 2: remaining steps + Claude in parallel
     const steps=getScanSteps();
-    const startStep=state.perplexityKey&&!state.demoMode?3:1;
+    const startStep=(state.perplexityKey||state.demoMode)?3:1;
     const stepThrough=async()=>{
       for(let i=startStep;i<=steps.length;i++){
         state.step=i;updateScanLog();
