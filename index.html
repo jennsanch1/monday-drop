@@ -131,8 +131,18 @@ let state = {
   slackSent:     false,
   slackError:    '',
   showWebhookInput: false,
-  history:       JSON.parse(localStorage.getItem('lab_history') || '[]'),
-  showHistory:   false,
+  siteUrl:       localStorage.getItem('lab_site_url') || '',
+  showSiteUrlInput: false,
+  history:             JSON.parse(localStorage.getItem('lab_history') || '[]'),
+  showHistory:         false,
+  selectedHistoryId:   null,
+  expandedHistorySections: new Set([0]),
+  historyView:         'board',
+  historyDetailId:     null,
+  autoPilotEnabled:    localStorage.getItem('lab_autopilot') === 'true',
+  autoPilotLog:        JSON.parse(localStorage.getItem('lab_autopilot_log') || '[{"date":"May 4, 2026","time":"8:02 AM","status":"sent","clients":6},{"date":"Apr 27, 2026","time":"8:01 AM","status":"sent","clients":6},{"date":"Apr 20, 2026","time":"8:00 AM","status":"failed","note":"Webhook expired"}]'),
+  autoPilotSimulating: false,
+  autoPilotJustSent:   false,
 };
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -291,21 +301,9 @@ function generateSlackMessage() {
       parseClientBlocksFromBody(s.body).forEach(b=>{
         const name=b.name.split('(')[0].trim();
         const news=(b.lines.find(l=>l.match(/^News:/i))||'').replace(/^News:\s*/i,'').replace(/\*\*/g,'').trim();
-        if (news) msg+=`• *${name}* — ${news.length>120?news.slice(0,120)+'…':news}\n`;
+        if (news) msg+=`• *${name}* → ${news.length>120?news.slice(0,120)+'…':news}\n`;
       });
-      msg+='\n';
-    } else if (s.title==='DESIGN SIGNALS WORTH WATCHING') {
-      msg+=`👁 *DESIGN SIGNALS*\n`;
-      let n=1;
-      s.body.split('\n').forEach(line=>{
-        const m=line.match(/^\d+\.\s+(.*)/);
-        if(m){const t=m[1].replace(/\*\*(.+?)\*\*/g,'*$1*');msg+=`${n}. ${t.length>130?t.slice(0,130)+'…':t}\n`;n++;}
-      });
-      msg+='\n';
-    } else if (s.title==='WHAT COMPETITORS ARE DOING') {
-      msg+=`🏢 *COMPETITOR MOVES*\n`;
-      s.body.split('\n').filter(l=>l.trim()).slice(0,3).forEach(l=>msg+=`${l.replace(/\*\*/g,'*').slice(0,180)}\n`);
-      msg+='\n';
+      msg+='\n\n';
     } else if (s.title==='ONE THING TO BRING UP WITH A CLIENT THIS WEEK') {
       msg+=`↗️ *THE MOVE THIS WEEK*\n`;
       const c=s.body.replace(/\*\*/g,'*').trim();
@@ -316,15 +314,22 @@ function generateSlackMessage() {
       msg+=`${c.length>220?c.slice(0,220)+'…':c}\n\n`;
     }
   }
-  msg+=`_— The Lab Studio Intel Agent_`;
-  return msg;
+  if (state.siteUrl) msg+=`\n<${state.siteUrl}|View Full Report>`;
+  return msg.trimEnd();
 }
 
 function renderSlackMsgPreview(msg) {
+  let inMove = false;
   return msg.split('\n').map(line=>{
+    if (line.includes('THE MOVE THIS WEEK')) inMove = true;
+    else if (line.match(/^[📡⚡🏢👁🔍]/)) inMove = false;
     if (line.startsWith('━')) return `<div style="border-top:1px solid rgba(255,255,255,0.08);margin:6px 0;"></div>`;
-    if (line.startsWith('>')) return `<div style="border-left:2px solid rgba(255,255,255,0.2);padding-left:10px;color:rgba(255,255,255,0.5);font-style:italic;margin:2px 0;font-size:12.5px;">${esc(line.slice(1))}</div>`;
-    const formatted=esc(line).replace(/\*(.+?)\*/g,'<strong style="color:#fff;">$1</strong>').replace(/_(.*?)_/g,'<em>$1</em>');
+    if (line.startsWith('>')) {
+      const formatted = esc(line.slice(1)).replace(/\*(.+?)\*/g,'<strong style="color:#fff;">$1</strong>');
+      if (inMove) return `<div style="border-left:3px solid ${C.lime};padding:8px 12px;background:rgba(215,230,65,0.05);border-radius:0 4px 4px 0;color:rgba(255,255,255,0.7);font-size:12.5px;line-height:1.6;margin:4px 0;">${formatted}</div>`;
+      return `<div style="border-left:2px solid rgba(255,255,255,0.2);padding-left:10px;color:rgba(255,255,255,0.5);font-style:italic;margin:2px 0;font-size:12.5px;">${formatted}</div>`;
+    }
+    const formatted=esc(line).replace(/&lt;https?:\/\/[^|]+\|([^>]+)&gt;/g,'<span style="color:rgba(255,255,255,0.6);">$1</span>').replace(/\*(.+?)\*/g,'<strong style="color:#fff;">$1</strong>').replace(/_(.*?)_/g,'<em>$1</em>');
     const isHeader=line.match(/^[📡👁🏢↗️⚡🔍]/);
     return `<div style="font-size:${isHeader?'13px':'12.5px'};font-weight:${isHeader?600:400};color:${isHeader?'#fff':'rgba(255,255,255,0.55)'};line-height:1.6;margin-bottom:${isHeader?'3px':'1px'};">${formatted||'&nbsp;'}</div>`;
   }).join('');
@@ -337,7 +342,10 @@ async function sendToSlack() {
     await fetch(state.slackWebhook, {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({username:'Labi',icon_emoji:':mag:',text:generateSlackMessage()}),
+      body: JSON.stringify({
+        username:'Labi', icon_emoji:':mag:',
+        text: generateSlackMessage(),
+      }),
     });
     state.slackSent=true; state.slackSending=false; render();
     setTimeout(()=>{state.slackSent=false;render();},4000);
@@ -556,6 +564,25 @@ function renderSlackPreview() {
         <span style="font-family:${GM};font-size:9px;color:${C.dim};">Connected to Slack</span>
         <button id="disconnect-slack-btn" style="background:none;border:none;color:${C.dim};cursor:pointer;font-family:${GM};font-size:9px;margin-left:auto;text-decoration:underline;">disconnect</button>
       </div>`:'')}
+      <div style="padding:8px 18px;border-bottom:1px solid rgba(255,255,255,0.04);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span style="font-size:12px;">🔗</span>
+        <span style="font-family:${GM};font-size:9px;color:${C.dim};">REPORT LINK</span>
+        ${state.siteUrl
+          ? `<span style="font-family:${GM};font-size:9px;color:${C.teal};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px;" title="${esc(state.siteUrl)}">${esc(state.siteUrl)}</span>
+             <button id="edit-site-url-btn" style="background:none;border:none;color:${C.dim};cursor:pointer;font-family:${GM};font-size:9px;text-decoration:underline;white-space:nowrap;">edit</button>
+             <button id="clear-site-url-btn" style="background:none;border:none;color:${C.dim};cursor:pointer;font-family:${GM};font-size:9px;text-decoration:underline;white-space:nowrap;">remove</button>`
+          : `<button id="add-site-url-btn" style="background:none;border:none;color:${C.dim};cursor:pointer;font-family:${GM};font-size:9px;text-decoration:underline;white-space:nowrap;">${state.showSiteUrlInput?'cancel':'+ add link'}</button>`
+        }
+      </div>
+      ${state.showSiteUrlInput?`
+      <div style="padding:10px 18px;border-bottom:1px solid rgba(255,255,255,0.04);background:rgba(0,230,197,0.03);">
+        <p style="font-family:${GF};font-size:11px;color:${C.dim};margin-bottom:8px;">Paste your hosted report URL (Vercel, Netlify, etc.) — it will appear as a link in every Slack message.</p>
+        <div style="display:flex;gap:8px;">
+          <input id="site-url-input" placeholder="https://your-report.vercel.app" value="${esc(state.siteUrl)}"
+            style="flex:1;padding:8px 12px;border:1px solid ${C.border};border-radius:6px;font-family:${GM};font-size:11px;background:${C.surface};color:#fff;" />
+          <button id="save-site-url-btn" style="padding:8px 14px;background:${C.teal};border:none;border-radius:6px;font-family:${GF};font-size:12px;font-weight:600;color:#000;cursor:pointer;white-space:nowrap;">Save</button>
+        </div>
+      </div>`:''}
       <div style="padding:18px;">
         <div style="display:flex;gap:12px;">
           <div style="width:34px;height:34px;border-radius:6px;background:linear-gradient(135deg,${C.blue},${C.teal});flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:${GF};font-size:11px;font-weight:700;color:#000;">TL</div>
@@ -575,43 +602,185 @@ function renderSlackPreview() {
     </div>`;
 }
 
+// ─── HISTORY COLORS ───────────────────────────────────────────────────────────
+const WEEK_COLORS = [
+  { bg:'rgba(215,230,65,0.08)',  border:'rgba(215,230,65,0.25)',  accent:'#d7e641' },
+  { bg:'rgba(0,230,197,0.08)',   border:'rgba(0,230,197,0.25)',   accent:'#00E6C5' },
+  { bg:'rgba(79,142,247,0.08)',  border:'rgba(79,142,247,0.25)',  accent:'#4f8ef7' },
+  { bg:'rgba(167,139,250,0.08)', border:'rgba(167,139,250,0.25)', accent:'#a78bfa' },
+  { bg:'rgba(248,180,100,0.08)', border:'rgba(248,180,100,0.25)', accent:'#f8b464' },
+];
+
 // ─── HISTORY PANEL ────────────────────────────────────────────────────────────
+const SECTION_META = {
+  'THIS WEEK IN CLIENT INDUSTRIES':              { icon:'📡', label:'CLIENT WATCH' },
+  'DESIGN SIGNALS WORTH WATCHING':               { icon:'👁', label:'DESIGN SIGNALS' },
+  'WHAT COMPETITORS ARE DOING':                  { icon:'🏢', label:'COMPETITOR MOVES' },
+  'ONE THING TO BRING UP WITH A CLIENT THIS WEEK':{ icon:'↗️', label:'THE MOVE' },
+  'STUDIO TOOL ALERT':                           { icon:'⚡', label:'TOOL ALERT' },
+  "THIS WEEK'S INTELLIGENCE":                    { icon:'🔍', label:'INTELLIGENCE' },
+};
+
 function renderHistoryPanel() {
-  return `
-    <div class="history-panel" style="position:fixed;top:0;right:0;bottom:0;width:min(420px,100vw);background:#0a0a0a;border-left:1px solid ${C.border};z-index:200;display:flex;flex-direction:column;overflow:hidden;">
-      <div style="padding:18px 20px;border-bottom:1px solid ${C.border};display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(12px);background:rgba(10,10,10,0.9);">
+  const history = state.history;
+
+  const shell = (backBtn, inner) => `
+    <div class="history-panel" style="position:fixed;top:0;right:0;bottom:0;width:min(460px,100vw);background:#0a0a0a;border-left:1px solid ${C.border};z-index:200;display:flex;flex-direction:column;overflow:hidden;">
+      <div style="padding:14px 20px;border-bottom:1px solid ${C.border};display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
         <div style="display:flex;align-items:center;gap:10px;">
+          ${backBtn?`<button id="history-back" style="background:none;border:none;color:${C.dim};cursor:pointer;font-family:${GM};font-size:9px;letter-spacing:0.1em;display:flex;align-items:center;gap:5px;padding:0;">← BACK</button><div style="width:1px;height:14px;background:${C.border};"></div>`:''}
           <span style="color:${C.dim};display:flex;">${ICON_HISTORY}</span>
           <span style="font-family:${GM};font-size:10px;font-weight:500;letter-spacing:0.14em;color:${C.dim};">PAST DROPS</span>
-          <span style="font-family:${GM};font-size:9px;color:rgba(255,255,255,0.15);background:${C.surface};padding:2px 8px;border-radius:100px;">${state.history.length}</span>
+          <span style="font-family:${GM};font-size:9px;color:rgba(255,255,255,0.15);background:${C.surface};padding:2px 8px;border-radius:100px;">${history.length}</span>
         </div>
-        <button id="close-history" style="background:none;border:none;color:${C.dim};cursor:pointer;font-size:18px;line-height:1;">×</button>
+        <button id="close-history" style="background:none;border:none;color:${C.dim};cursor:pointer;font-size:20px;line-height:1;">×</button>
       </div>
-      <div style="flex:1;overflow-y:auto;padding:16px;">
-        ${state.history.length===0?`
-          <div style="text-align:center;padding:60px 20px;">
-            <div style="font-size:32px;margin-bottom:12px;opacity:0.3;">🗂</div>
-            <div style="font-family:${GF};font-size:13px;color:${C.dim};line-height:1.6;">No past drops yet.<br>Run your first drop to save it here.</div>
-          </div>`:
-          state.history.map((item,i)=>`
-            <div style="background:${C.card};border:1px solid ${C.border};border-radius:8px;padding:16px;margin-bottom:10px;animation:fadeInUp 0.3s ease ${i*40}ms forwards;opacity:0;">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-                <div style="display:flex;align-items:center;gap:8px;">
-                  <span style="font-family:${GM};font-size:9px;color:${C.lime};background:rgba(215,230,65,0.1);padding:3px 10px;border-radius:100px;">${esc(item.date)}</span>
-                  <span style="font-family:${GM};font-size:9px;color:${C.dim};">WK ${item.weekNum}</span>
-                </div>
-                <button class="delete-history" data-id="${item.id}" style="background:none;border:none;color:${C.dim};cursor:pointer;font-size:14px;opacity:0.5;transition:opacity 0.15s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.5">×</button>
-              </div>
-              <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;">
-                ${item.clients.map(c=>`<span style="font-family:${GF};font-size:10px;color:${C.dim};background:${C.surface};padding:2px 8px;border-radius:100px;border:1px solid ${C.border};">${esc(c)}</span>`).join('')}
-              </div>
-              <div style="font-family:${GF};font-size:12px;color:${C.dim};line-height:1.5;margin-bottom:12px;opacity:0.7;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${esc(item.preview)}</div>
-              <button class="view-history" data-id="${item.id}" style="width:100%;padding:8px;background:${C.surface};border:1px solid ${C.border};border-radius:6px;font-family:${GF};font-size:12px;font-weight:500;color:#fff;cursor:pointer;transition:all 0.15s ease;" onmouseover="this.style.borderColor='rgba(255,255,255,0.2)'" onmouseout="this.style.borderColor='${C.border}'">
-                View this drop →
-              </button>
-            </div>`).join('')}
-      </div>
+      ${inner}
     </div>`;
+
+  if (history.length === 0) return shell(false, `
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:40px 20px;text-align:center;">
+      <div>
+        <div style="font-size:32px;margin-bottom:12px;opacity:0.3;">🗂</div>
+        <div style="font-family:${GF};font-size:13px;color:${C.dim};line-height:1.6;">No past drops yet.<br>Run your first drop to save it here.</div>
+      </div>
+    </div>`);
+
+  // ── DETAIL VIEW ──────────────────────────────────────────────────────────────
+  if (state.historyView === 'detail') {
+    const item = history.find(h => h.id === state.historyDetailId) || history[0];
+    const sections = parseReport(item.report);
+    return shell(true, `
+      <div style="flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px;">
+        <div style="animation:fadeInUp 0.2s ease forwards;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-family:${GM};font-size:22px;font-weight:800;color:#fff;letter-spacing:-0.02em;">WK ${item.weekNum}</span>
+              <span style="font-family:${GM};font-size:9px;color:${C.dim};background:${C.surface};padding:3px 10px;border-radius:100px;border:1px solid ${C.border};">${esc(item.date)}</span>
+            </div>
+            <button class="delete-history-selected" data-id="${item.id}" style="background:none;border:none;color:${C.dim};cursor:pointer;font-family:${GM};font-size:9px;opacity:0.4;text-decoration:underline;transition:opacity 0.15s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.4">delete</button>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:4px;">
+            ${item.clients.map(c=>`<span style="font-family:${GF};font-size:10px;color:${C.dim};background:${C.surface};padding:2px 8px;border-radius:100px;border:1px solid ${C.border};">${esc(c)}</span>`).join('')}
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          ${sections.map((s,i)=>{
+            const meta = SECTION_META[s.title] || {icon:'•', label:s.title};
+            const col = WEEK_COLORS[i % WEEK_COLORS.length];
+            const bodyHtml = esc(s.body.trim())
+              .replace(/\*\*(.+?)\*\*/g,'<strong style="color:#fff;font-weight:600;">$1</strong>')
+              .replace(/\*(.+?)\*/g,'<em style="color:rgba(255,255,255,0.7);">$1</em>');
+            return `
+            <div style="background:${col.bg};border:1px solid ${col.border};border-radius:10px;padding:16px;animation:fadeInUp 0.25s ease ${i*50}ms forwards;opacity:0;">
+              <div style="display:flex;align-items:center;gap:7px;margin-bottom:10px;">
+                <span style="font-size:14px;">${meta.icon}</span>
+                <span style="font-family:${GM};font-size:9px;letter-spacing:0.12em;color:${col.accent};font-weight:600;">${meta.label}</span>
+              </div>
+              <div style="font-family:${GF};font-size:12px;color:rgba(255,255,255,0.6);line-height:1.75;white-space:pre-wrap;">${bodyHtml}</div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`);
+  }
+
+  // ── BOARD VIEW (sticky notes) ─────────────────────────────────────────────
+  return shell(false, `
+    <div style="flex:1;overflow-y:auto;padding:20px;">
+      <div style="font-family:${GM};font-size:9px;color:${C.dim};letter-spacing:0.12em;margin-bottom:14px;">TAP A WEEK TO EXPLORE</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        ${history.map((item, i) => {
+          const col = WEEK_COLORS[i % WEEK_COLORS.length];
+          const clientPreview = item.clients.slice(0,3).join(' · ') + (item.clients.length > 3 ? ` +${item.clients.length-3}` : '');
+          return `
+          <button class="history-board-note" data-id="${item.id}" style="
+            background:${col.bg};border:1px solid ${col.border};border-radius:12px;
+            padding:18px 16px;cursor:pointer;text-align:left;
+            transition:transform 0.15s,border-color 0.15s,box-shadow 0.15s;
+            animation:fadeInUp 0.3s ease ${i*60}ms forwards;opacity:0;
+          " onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 8px 24px rgba(0,0,0,0.4)';this.style.borderColor='${col.accent}';"
+            onmouseout="this.style.transform='';this.style.boxShadow='';this.style.borderColor='${col.border}';">
+            <div style="font-family:${GM};font-size:28px;font-weight:800;color:${col.accent};letter-spacing:-0.02em;line-height:1;margin-bottom:8px;">WK ${item.weekNum}</div>
+            <div style="font-family:${GM};font-size:9px;color:rgba(255,255,255,0.35);letter-spacing:0.08em;margin-bottom:12px;">${esc(item.date)}</div>
+            <div style="font-family:${GF};font-size:11px;color:rgba(255,255,255,0.4);line-height:1.5;">${esc(clientPreview)}</div>
+          </button>`;
+        }).join('')}
+      </div>
+    </div>`);
+}
+
+// ─── AUTO-PILOT ───────────────────────────────────────────────────────────────
+function renderAutoPilot() {
+  const on = state.autoPilotEnabled;
+  const log = state.autoPilotLog;
+  const sim = state.autoPilotSimulating;
+  const sent = state.autoPilotJustSent;
+
+  const now = new Date();
+  const daysUntilMonday = (1 + 7 - now.getDay()) % 7 || 7;
+  const nextMonday = new Date(now); nextMonday.setDate(now.getDate() + daysUntilMonday);
+  const nextLabel = nextMonday.toLocaleDateString('en-US',{month:'long',day:'numeric'}) + ' at 8:00 AM';
+
+  return `
+  <div style="background:${C.card};border:1px solid ${C.border};border-radius:8px;overflow:hidden;margin-top:12px;animation:fadeInUp 0.5s ease 0.6s forwards;opacity:0;">
+    <div style="padding:12px 18px;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;align-items:center;justify-content:space-between;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:13px;">⚡</span>
+        <span style="font-family:${GM};font-size:9px;letter-spacing:0.14em;color:${C.dim};">AUTO-PILOT</span>
+        ${on?`<span style="background:rgba(0,230,197,0.1);color:${C.teal};padding:2px 8px;border-radius:100px;font-family:${GM};font-size:8px;letter-spacing:0.1em;">ACTIVE</span>`:''}
+        ${state.demoMode?`<span style="background:rgba(216,92,224,0.1);color:#d85ce0;padding:2px 8px;border-radius:100px;font-family:${GM};font-size:8px;letter-spacing:0.1em;">DEMO</span>`:''}
+      </div>
+      <button id="autopilot-toggle" style="
+        width:42px;height:23px;border-radius:100px;border:none;cursor:pointer;position:relative;
+        background:${on?C.teal:'rgba(255,255,255,0.08)'};transition:background 0.25s;flex-shrink:0;
+      "><span style="position:absolute;top:3px;width:17px;height:17px;border-radius:50%;background:#fff;transition:left 0.25s;left:${on?'22px':'3px'};"></span></button>
+    </div>
+
+    ${on?`
+    <div style="padding:14px 18px;display:flex;flex-direction:column;gap:10px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div style="background:${C.surface};border:1px solid ${C.border};border-radius:8px;padding:12px 14px;">
+          <div style="font-family:${GM};font-size:8px;color:${C.dim};letter-spacing:0.1em;margin-bottom:5px;">SCHEDULE</div>
+          <div style="font-size:13px;font-weight:600;">Every Monday</div>
+          <div style="font-family:${GM};font-size:10px;color:${C.dim};margin-top:2px;">8:00 AM CST</div>
+        </div>
+        <div style="background:rgba(0,230,197,0.05);border:1px solid rgba(0,230,197,0.15);border-radius:8px;padding:12px 14px;">
+          <div style="font-family:${GM};font-size:8px;color:${C.teal};letter-spacing:0.1em;margin-bottom:5px;">NEXT RUN</div>
+          <div style="font-size:12px;font-weight:600;color:${C.teal};">${nextLabel}</div>
+          <div style="font-family:${GM};font-size:10px;color:${C.dim};margin-top:2px;">${state.clients.length} clients · Slack</div>
+        </div>
+      </div>
+
+      <div>
+        <div style="font-family:${GM};font-size:8px;color:${C.dim};letter-spacing:0.1em;margin-bottom:8px;">RUN LOG</div>
+        <div style="display:flex;flex-direction:column;gap:5px;">
+          ${log.map(entry=>`
+          <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:${C.surface};border:1px solid ${C.border};border-radius:6px;">
+            <span style="font-family:${GM};font-size:8px;padding:2px 7px;border-radius:100px;flex-shrink:0;
+              background:${entry.status==='sent'?'rgba(0,230,197,0.1)':'rgba(248,113,113,0.1)'};
+              color:${entry.status==='sent'?C.teal:'#f87171'};">${entry.status==='sent'?'SENT':'FAILED'}</span>
+            <span style="font-family:${GM};font-size:9px;color:${C.dim};flex:1;">${esc(entry.date)} · ${esc(entry.time)}</span>
+            <span style="font-size:11px;color:rgba(255,255,255,0.3);">${entry.note?esc(entry.note):entry.clients+' clients'}</span>
+          </div>`).join('')}
+        </div>
+      </div>
+
+      ${state.demoMode?`
+      <button id="autopilot-simulate" style="
+        width:100%;padding:10px;border-radius:8px;cursor:${sim?'default':'pointer'};
+        background:${sent?'rgba(0,230,197,0.15)':sim?'rgba(255,255,255,0.04)':'rgba(255,255,255,0.05)'};
+        border:1px solid ${sent?C.teal:sim?C.border:C.border};
+        font-family:${GM};font-size:10px;letter-spacing:0.08em;
+        color:${sent?C.teal:sim?C.dim:'rgba(255,255,255,0.5)'};
+        transition:all 0.2s;display:flex;align-items:center;justify-content:center;gap:8px;
+      " ${sim?'disabled':''}>
+        ${sent?'✓ DROP SENT TO SLACK':sim?'<span style="display:flex;gap:3px;"><span style="animation:bounce 0.6s infinite 0ms alternate;display:inline-block;width:5px;height:5px;border-radius:50%;background:currentColor;"></span><span style="animation:bounce 0.6s infinite 150ms alternate;display:inline-block;width:5px;height:5px;border-radius:50%;background:currentColor;"></span><span style="animation:bounce 0.6s infinite 300ms alternate;display:inline-block;width:5px;height:5px;border-radius:50%;background:currentColor;"></span></span> RUNNING DROP…':'▶ SIMULATE MONDAY DROP'}
+      </button>`:''}
+    </div>`:`
+    <div style="padding:16px 18px;text-align:center;">
+      <div style="font-family:${GF};font-size:12px;color:${C.dim};line-height:1.6;">Enable auto-pilot to send the drop to Slack every Monday at 8am automatically — no clicks needed.</div>
+    </div>`}
+  </div>`;
 }
 
 // ─── SETUP SCREEN ─────────────────────────────────────────────────────────────
@@ -749,6 +918,7 @@ function renderMain() {
         </div>
         ${renderSectionsWithBento(sections)}
         ${renderSlackPreview()}
+        ${renderAutoPilot()}
         <div style="margin-top:32px;padding-top:20px;border-top:1px solid ${C.border};display:flex;justify-content:space-between;align-items:center;">
           <div style="font-family:${GM};font-size:10px;color:${C.dim};">Generated ${new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div>
           <div style="font-family:${GM};font-size:9px;font-weight:500;letter-spacing:0.1em;color:${C.dim};background:${C.surface};border:1px solid ${C.border};padding:4px 12px;border-radius:100px;">THE LAB STUDIO</div>
@@ -832,22 +1002,57 @@ function bindMain() {
   document.getElementById('disconnect-slack-btn')?.addEventListener('click',()=>{
     state.slackWebhook='';localStorage.removeItem('lab_slack_webhook');render();
   });
+  document.getElementById('add-site-url-btn')?.addEventListener('click',()=>{state.showSiteUrlInput=!state.showSiteUrlInput;render();});
+  document.getElementById('edit-site-url-btn')?.addEventListener('click',()=>{state.showSiteUrlInput=true;render();});
+  document.getElementById('clear-site-url-btn')?.addEventListener('click',()=>{state.siteUrl='';localStorage.removeItem('lab_site_url');state.showSiteUrlInput=false;render();});
+  document.getElementById('save-site-url-btn')?.addEventListener('click',()=>{
+    const url=document.getElementById('site-url-input')?.value.trim()||'';
+    if(!url.startsWith('http')){return;}
+    state.siteUrl=url;state.showSiteUrlInput=false;localStorage.setItem('lab_site_url',url);render();
+  });
 
   // History
-  document.getElementById('history-btn')?.addEventListener('click',()=>{state.showHistory=true;render();});
+  document.getElementById('history-btn')?.addEventListener('click',()=>{
+    state.showHistory=true; state.historyView='board'; render();
+  });
   document.getElementById('close-history')?.addEventListener('click',()=>{state.showHistory=false;render();});
-  document.querySelectorAll('.view-history').forEach(btn=>{
+  document.getElementById('history-back')?.addEventListener('click',()=>{state.historyView='board';render();});
+  document.querySelectorAll('.history-board-note').forEach(btn=>{
     btn.addEventListener('click',()=>{
-      const item=state.history.find(h=>h.id===parseInt(btn.dataset.id));
-      if(!item)return;
-      state.report=item.report;state.phase='done';state.showHistory=false;render();
+      state.historyDetailId=parseInt(btn.dataset.id);
+      state.historyView='detail'; render();
     });
   });
-  document.querySelectorAll('.delete-history').forEach(btn=>{
+  document.querySelectorAll('.delete-history-selected').forEach(btn=>{
     btn.addEventListener('click',()=>{
-      state.history=state.history.filter(h=>h.id!==parseInt(btn.dataset.id));
-      localStorage.setItem('lab_history',JSON.stringify(state.history));render();
+      const id=parseInt(btn.dataset.id);
+      state.history=state.history.filter(h=>h.id!==id);
+      localStorage.setItem('lab_history',JSON.stringify(state.history));
+      state.historyView='board'; render();
     });
+  });
+
+  // Auto-Pilot
+  document.getElementById('autopilot-toggle')?.addEventListener('click',()=>{
+    state.autoPilotEnabled=!state.autoPilotEnabled;
+    localStorage.setItem('lab_autopilot', state.autoPilotEnabled);
+    render();
+  });
+  document.getElementById('autopilot-simulate')?.addEventListener('click',()=>{
+    if(state.autoPilotSimulating||state.autoPilotJustSent) return;
+    state.autoPilotSimulating=true; render();
+    setTimeout(()=>{
+      const now=new Date();
+      const entry={
+        date:now.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),
+        time:now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),
+        status:'sent', clients:state.clients.length
+      };
+      state.autoPilotLog=[entry,...state.autoPilotLog].slice(0,5);
+      localStorage.setItem('lab_autopilot_log',JSON.stringify(state.autoPilotLog));
+      state.autoPilotSimulating=false; state.autoPilotJustSent=true; render();
+      setTimeout(()=>{state.autoPilotJustSent=false;render();},3000);
+    },2200);
   });
 }
 
@@ -885,7 +1090,7 @@ async function runDrop() {
     ]);
     clearInterval(timerInterval);
     state.report=result;state.phase='done';
-    if(!state.demoMode)saveHistory(result);
+    saveHistory(result);
   } catch(e) {
     clearInterval(timerInterval);
     state.error=e.message;state.phase='idle';
