@@ -9,36 +9,17 @@
   <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #000; color: #fff; font-family: 'Geist', sans-serif; min-height: 100vh; }
-    body::before {
-      content: '';
-      position: fixed; inset: 0;
-      background-image: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
-      background-size: 24px 24px;
-      pointer-events: none; z-index: 0;
-    }
+    html { scroll-behavior: smooth; }
+    body { background: #000; color: #fff; font-family: 'Geist', sans-serif; min-height: 100vh; overflow-x: hidden; }
     #app { position: relative; z-index: 1; }
 
-    @keyframes fadeInUp {
-      from { opacity: 0; transform: translateY(20px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes ticker {
-      0%   { transform: translateX(0); }
-      100% { transform: translateX(-50%); }
-    }
+    @keyframes fadeInUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
     @keyframes scanBlink { 0%,100% { opacity:1; } 50% { opacity:0.15; } }
     @keyframes progressBar { from { width:0%; } to { width:100%; } }
     @keyframes glowPulse  { 0%,100% { opacity:0.4; } 50% { opacity:1; } }
     @keyframes spin { to { transform: rotate(360deg); } }
-    @keyframes ripple {
-      0%   { transform: scale(0.8); opacity: 0.6; }
-      100% { transform: scale(2.2); opacity: 0; }
-    }
-    @keyframes slideIn {
-      from { opacity:0; transform: translateX(100%); }
-      to   { opacity:1; transform: translateX(0); }
-    }
+    @keyframes slideIn { from { opacity:0; transform:translateX(100%); } to { opacity:1; transform:translateX(0); } }
+    @keyframes revealUp { from { opacity:0; transform:translateY(32px); } to { opacity:1; transform:translateY(0); } }
 
     .fu  { animation: fadeInUp .5s ease forwards; }
     .fu1 { animation: fadeInUp .5s ease .05s forwards; opacity:0; }
@@ -47,21 +28,57 @@
     .fu4 { animation: fadeInUp .5s ease .28s forwards; opacity:0; }
     .fu5 { animation: fadeInUp .5s ease .36s forwards; opacity:0; }
 
+    /* ── Chip & Button transitions ── */
     .chip { transition: all .15s ease; }
-    .chip:hover { background:rgba(0,153,255,0.12)!important; border-color:rgba(0,153,255,0.4)!important; transform:translateY(-1px); }
+    .chip:hover { background:rgba(0,153,255,0.1)!important; border-color:rgba(0,153,255,0.35)!important; transform:translateY(-2px); }
     .run-btn { transition: all .18s ease; }
-    .run-btn:hover:not(:disabled) { opacity:.85; transform:translateY(-2px); box-shadow:0 8px 32px rgba(0,153,255,0.25); }
+    .run-btn:hover:not(:disabled) { opacity:.88; transform:translateY(-2px); box-shadow:0 12px 40px rgba(0,153,255,0.3); }
     .run-btn:active:not(:disabled) { transform:translateY(0)!important; box-shadow:none!important; }
     .ghost-btn { transition: all .15s ease; }
     .ghost-btn:hover { border-color:rgba(255,255,255,0.3)!important; color:#fff!important; }
     input:focus, textarea:focus { border-color:rgba(0,153,255,0.5)!important; outline:none; box-shadow:0 0 0 3px rgba(0,153,255,0.08); }
     ::-webkit-scrollbar { width:4px; }
     ::-webkit-scrollbar-track { background:transparent; }
-    ::-webkit-scrollbar-thumb { background:#222; border-radius:2px; }
+    ::-webkit-scrollbar-thumb { background:#333; border-radius:2px; }
+
+    /* ── Animations ── */
     .scan-blink { animation: scanBlink 1s ease infinite; }
     .pulse-dot  { animation: glowPulse 1.2s ease infinite; }
     .history-panel { animation: slideIn .3s ease forwards; }
     .client-tab { cursor:pointer; white-space:nowrap; transition:all .15s ease; }
+
+    /* ── Full-bleed section layout ── */
+    .section-full { width:100%; position:relative; }
+    .section-inner { max-width:1400px; margin:0 auto; width:100%; }
+    .section-big-title {
+      font-size: clamp(40px,5vw,72px);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.05;
+      margin-bottom: 48px;
+      white-space: pre-line;
+    }
+    .section-eyebrow {
+      display: inline-flex; align-items:center; gap:6px;
+      font-family:'Geist Mono',monospace; font-size:9px; letter-spacing:0.16em;
+      padding:5px 14px; border-radius:100px; margin-bottom:28px;
+    }
+
+    /* ── Signal cards hover ── */
+    .signal-card-hover { transition: transform .2s ease, background .2s ease; cursor:default; }
+    .signal-card-hover:hover { transform: translateX(5px); }
+
+    /* ── DS grid cards ── */
+    .ds-card-hover { transition: background .2s ease; }
+    .ds-card-hover:hover { background: rgba(255,255,255,0.03) !important; }
+
+    /* ── Client sidebar tabs ── */
+    .client-sidebar-tab { transition: all .15s ease; cursor:pointer; }
+    .client-sidebar-tab:hover { background: rgba(255,255,255,0.03) !important; }
+
+    /* ── Nav adaptive color ── */
+    #main-nav { transition: background 0.5s ease, border-color 0.5s ease; }
+    #main-nav .nav-adaptive { transition: color 0.4s ease; }
   </style>
 </head>
 <body>
@@ -93,6 +110,15 @@ function getSectionIcon(title) {
 }
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
+// ─── SECTION DESIGN MAP ───────────────────────────────────────────────────────
+const SECTION_DESIGN = {
+  'THIS WEEK IN CLIENT INDUSTRIES':               { bg:'#080413', accent:'#D7E641', tag:'📡 CLIENT WATCH',    headline:'This week\nin your clients.' },
+  'DESIGN SIGNALS WORTH WATCHING':               { bg:'#021510', accent:'#00e6c5', tag:'👁 DESIGN SIGNALS',  headline:'Worth watching\nthis week.' },
+  'ONE THING TO BRING UP WITH A CLIENT THIS WEEK':{ bg:'#120800', accent:'#f06a35', tag:'↗ THE MOVE',        headline:'The move\nthis week.' },
+  'WHAT COMPETITORS ARE DOING':                  { bg:'#0a0510', accent:'#d85ce0', tag:'🏢 COMPETITORS',     headline:'What competitors\nare doing.' },
+  'STUDIO TOOL ALERT':                           { bg:'#0f1500', accent:'#D7E641', tag:'⚡ STUDIO TOOL',     headline:'Studio tool\nalert.' },
+};
+
 function getScanSteps() {
   return (state.perplexityKey || state.demoMode) ? [
     'Connecting to Perplexity search engine...',
@@ -165,6 +191,9 @@ let state = {
   historyView:         'board',
   historyDetailId:     null,
   autoPilotEnabled:    localStorage.getItem('lab_autopilot') === 'true',
+  autoPilotExpanded:   false,
+  showSettings:        false,
+  showConnectKeys:     false,
   autoPilotLog:        JSON.parse(localStorage.getItem('lab_autopilot_log') || '[{"date":"May 4, 2026","time":"8:02 AM","status":"sent","clients":6},{"date":"Apr 27, 2026","time":"8:01 AM","status":"sent","clients":6},{"date":"Apr 20, 2026","time":"8:00 AM","status":"failed","note":"Webhook expired"}]'),
   autoPilotSimulating: false,
   autoPilotJustSent:   false,
@@ -425,48 +454,60 @@ async function sendToSlack() {
 }
 
 // ─── SECTION RENDERERS ────────────────────────────────────────────────────────
-function renderIndustrySection(body) {
+function renderIndustrySection(body, accent) {
+  accent = accent || C.lime;
   const blocks=[]; let cur=null;
   for(const line of body.split('\n')){
     if(line.match(/^\*\*.+\*\*/)){if(cur)blocks.push(cur);cur={name:line.replace(/\*\*/g,'').trim(),lines:[]};}
     else if(cur&&line.trim())cur.lines.push(line);
   }
   if(cur)blocks.push(cur);
-  if(!blocks.length) return `<div style="padding:24px;font-family:${GF};font-size:14px;line-height:1.78;color:${C.muted};">${parseMd(body)}</div>`;
+  if(!blocks.length) return `<div style="font-family:${GF};font-size:15px;line-height:1.78;color:${C.muted};">${parseMd(body)}</div>`;
 
-  const tabs = blocks.map((b,i)=>`
-    <button class="client-tab" data-tab="${i}"
-      style="padding:6px 14px;border-radius:100px;border:1px solid ${i===0?'rgba(215,230,65,0.3)':C.border};background:${i===0?'rgba(215,230,65,0.08)':'transparent'};color:${i===0?C.lime:C.dim};font-family:${GF};font-size:12px;font-weight:${i===0?600:400};">
-      ${esc(b.name.split('(')[0].trim())}
-    </button>`).join('');
+  const tabs = blocks.map((b,i)=>{
+    const clientName = b.name.split('(')[0].trim();
+    const industry = b.name.match(/\(([^)]+)\)/)?.[1]||'';
+    const isActive = i===0;
+    return `
+    <button class="client-sidebar-tab" data-tab="${i}"
+      style="flex:1;padding:0 0 0 24px;
+      background:${isActive?'rgba(255,255,255,0.04)':'transparent'};
+      border:none;outline:none;
+      border-left:2px solid ${isActive?accent:'transparent'};
+      width:100%;text-align:left;display:flex;flex-direction:column;justify-content:center;gap:3px;
+      transition:all 0.15s ease;cursor:pointer;">
+      <div style="font-size:15px;font-weight:${isActive?700:400};color:${isActive?'#fff':'rgba(255,255,255,0.3)'};">${esc(clientName)}</div>
+      <div style="font-size:11px;color:${isActive?'rgba(255,255,255,0.3)':'rgba(255,255,255,0.15)'};">${esc(industry)}</div>
+    </button>`;
+  }).join('');
 
   const panels = blocks.map((b,i)=>{
     const industry=b.name.match(/\(([^)]+)\)/)?.[1]||'';
     const rows=b.lines.map(line=>{
       const m=line.match(/^(News|Why it matters|Question to bring up):\s*(.*)/i);
       if(!m) return '';
-      const labelColor={news:C.teal,'why it matters':C.blue,'question to bring up':C.muted}[m[1].toLowerCase()]||C.muted;
-      return `<div style="padding:14px 0;border-bottom:1px solid ${C.border};">
-        <div style="font-family:${GM};font-size:9px;font-weight:500;letter-spacing:0.14em;color:${labelColor};margin-bottom:7px;text-transform:uppercase;">${m[1]}</div>
-        <div style="font-family:${GF};font-size:14px;color:${C.muted};line-height:1.7;">${parseMd(m[2])}</div>
+      const lc = m[1].toLowerCase();
+      const labelColor = lc==='news'?C.teal : lc==='why it matters'?C.blue : C.dim;
+      return `<div style="padding:20px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
+        <div style="font-family:${GM};font-size:9px;letter-spacing:0.16em;color:${labelColor};margin-bottom:10px;text-transform:uppercase;">${m[1]}</div>
+        <div style="font-family:${GF};font-size:16px;color:rgba(255,255,255,0.7);line-height:1.7;">${parseMd(m[2])}</div>
       </div>`;
     }).join('');
-    return `<div class="client-panel" data-panel="${i}" style="display:${i===0?'block':'none'};">
-      <div style="display:flex;align-items:baseline;gap:10px;padding:18px 0 4px;">
-        <div style="font-family:${GF};font-size:15px;font-weight:600;color:#fff;">${esc(b.name.split('(')[0].trim())}</div>
-        ${industry?`<div style="font-family:${GM};font-size:10px;color:${C.dim};">${esc(industry)}</div>`:''}
-      </div>
-      ${rows}<div style="height:8px;"></div>
+    return `<div class="client-panel" data-panel="${i}" style="display:${i===0?'block':'none'};flex:1;">
+      <div style="font-size:36px;font-weight:800;letter-spacing:-0.03em;line-height:1;margin-bottom:6px;">${esc(b.name.split('(')[0].trim())}</div>
+      ${industry?`<div style="font-family:${GM};font-size:9px;color:${C.dim};letter-spacing:0.14em;margin-bottom:32px;text-transform:uppercase;">${esc(industry)}</div>`:'<div style="height:32px;"></div>'}
+      ${rows}
     </div>`;
   }).join('');
 
-  return `<div>
-    <div class="client-tabs-bar" style="display:flex;gap:6px;padding:14px 20px;border-bottom:1px solid ${C.border};overflow-x:auto;scrollbar-width:none;">${tabs}</div>
-    <div style="padding:0 20px;">${panels}</div>
+  return `<div style="display:flex;min-height:360px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;overflow:hidden;">
+    <div style="width:240px;flex-shrink:0;border-right:1px solid rgba(255,255,255,0.06);display:flex;flex-direction:column;">${tabs}</div>
+    <div style="flex:1;display:flex;padding:40px 48px;">${panels}</div>
   </div>`;
 }
 
-function renderDesignSignals(body) {
+function renderDesignSignals(body, accent) {
+  accent = accent || C.teal;
   const items=[]; let cur=null;
   body.split('\n').forEach(line=>{
     const m=line.match(/^(\d+)\.\s+(.*)/);
@@ -474,13 +515,14 @@ function renderDesignSignals(body) {
     else if(cur&&line.trim())cur.text+=' '+line.trim();
   });
   if(cur)items.push(cur);
-  if(!items.length) return `<div style="padding:24px;font-family:${GF};font-size:14px;line-height:1.78;color:${C.muted};">${parseMd(body)}</div>`;
-  return `<div style="padding:4px 20px 8px;">`+
+  if(!items.length) return `<div style="font-family:${GF};font-size:15px;line-height:1.78;color:${C.muted};">${parseMd(body)}</div>`;
+  const cols = items.length >= 3 ? `repeat(3,1fr)` : `repeat(${items.length},1fr)`;
+  return `<div style="display:grid;grid-template-columns:${cols};gap:1px;background:rgba(255,255,255,0.06);border-radius:12px;overflow:hidden;">` +
     items.map((item,i)=>`
-      <div style="display:flex;gap:20px;padding:18px 0;${i<items.length-1?`border-bottom:1px solid ${C.border}`:''}align-items:flex-start;">
-        <div style="font-family:${GM};font-size:40px;font-weight:700;color:rgba(255,255,255,0.05);line-height:1;flex-shrink:0;min-width:40px;user-select:none;">${item.num}</div>
-        <div style="font-family:${GF};font-size:14px;color:${C.muted};line-height:1.72;padding-top:7px;">${parseMd(item.text)}</div>
-      </div>`).join('')+`</div>`;
+      <div class="ds-card-hover" style="padding:40px 36px;background:#021510;">
+        <div style="font-family:${GM};font-size:64px;font-weight:700;color:rgba(255,255,255,0.05);line-height:1;margin-bottom:20px;user-select:none;">0${item.num}</div>
+        <div style="font-family:${GF};font-size:15px;color:rgba(255,255,255,0.55);line-height:1.72;">${parseMd(item.text).replace(/&lt;strong style=&quot;color:#fff;font-weight:600;&quot;&gt;/g,`<strong style="color:${accent};font-weight:600;">`).replace(/&lt;\/strong&gt;/g,'</strong>').replace(/<strong style="color:#fff;font-weight:600;">/g,`<strong style="color:${accent};font-weight:600;">`)}</div>
+      </div>`).join('') + `</div>`;
 }
 
 function renderGenericBody(body) {
@@ -488,57 +530,110 @@ function renderGenericBody(body) {
     body.split('\n').map(l=>`<div style="margin-bottom:4px;">${parseMd(l)||'&nbsp;'}</div>`).join('')+`</div>`;
 }
 
-// ─── LIVE SIGNALS CARD ────────────────────────────────────────────────────────
+// ─── LIVE SIGNALS CARD — Editorial grid layout ────────────────────────────────
 function renderLiveSignals() {
   const s = state.liveSignals;
   if (!s) return '';
-  const all = [...(s.clientNews||[]),...(s.designSignals||[])];
+  const clientNews = s.clientNews || [];
+  const designSignals = s.designSignals || [];
+  const all = [...clientNews, ...designSignals];
   if (!all.length) return '';
   const total = all.length;
-  return `
-    <div style="background:${C.card};border:1px solid rgba(0,153,255,0.2);border-radius:8px;overflow:hidden;margin-bottom:10px;animation:fadeInUp 0.5s ease forwards;opacity:0;">
-      <div style="padding:12px 20px;border-bottom:1px solid rgba(0,153,255,0.1);display:flex;align-items:center;justify-content:space-between;background:rgba(0,153,255,0.03);">
-        <div style="display:flex;align-items:center;gap:9px;">
-          <span style="font-size:14px;">🔎</span>
-          <span style="font-family:${GM};font-size:9px;font-weight:500;letter-spacing:0.14em;color:${C.dim};">LIVE SIGNALS</span>
-          <span style="background:rgba(0,153,255,0.12);color:${C.blue};padding:2px 8px;border-radius:100px;font-family:${GM};font-size:8px;letter-spacing:0.1em;">PERPLEXITY · ${total} SOURCES · THIS WEEK</span>
-        </div>
-        <span style="font-family:${GM};font-size:9px;color:${C.dim};">past 7 days</span>
+
+  const daysLabel = d => d===0?'Today':d===1?'Yesterday':d+' days ago';
+
+  // Featured = first client news item (largest)
+  const featured = all[0];
+  const leftCards = all.slice(1, 3);   // 2 smaller cards left
+  const rightCards = all.slice(3, 5);  // 2 smaller cards right
+  const rest = all.slice(5);
+
+  const smallCard = (item, isDesign) => {
+    const accent = isDesign ? C.teal : C.blue;
+    const bg = isDesign ? 'rgba(0,230,197,0.05)' : 'rgba(0,153,255,0.05)';
+    const tag = item.company || (isDesign ? 'Design Signal' : '');
+    return `<div class="signal-card-hover" style="background:${bg};border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:20px 22px;flex:1;display:flex;flex-direction:column;justify-content:space-between;">
+      <div>
+        <div style="font-family:${GM};font-size:8px;letter-spacing:0.12em;color:${accent};margin-bottom:10px;text-transform:uppercase;">${esc(tag)}</div>
+        <div style="font-family:${GF};font-size:13px;color:rgba(255,255,255,0.85);line-height:1.45;">${esc(item.headline)}</div>
       </div>
-      <div style="padding:14px 20px;display:flex;flex-direction:column;gap:8px;">
-        ${all.map((item,i)=>{
-          const isDesign = i >= (s.clientNews||[]).length;
-          const borderColor = isDesign ? C.teal : C.blue;
-          const bgColor = isDesign ? 'rgba(0,230,197,0.03)' : 'rgba(0,153,255,0.03)';
-          const tagColor = isDesign ? C.teal : C.blue;
-          const daysLabel = item.daysAgo===0?'today':item.daysAgo===1?'yesterday':item.daysAgo+' days ago';
-          return `<div style="border-left:2px solid ${borderColor};padding:8px 12px;background:${bgColor};border-radius:0 6px 6px 0;animation:fadeInUp 0.4s ease ${i*50}ms both;">
-            <div style="font-family:${GF};font-size:12.5px;color:rgba(255,255,255,0.85);line-height:1.4;margin-bottom:4px;">${esc(item.headline)}</div>
-            <div style="display:flex;gap:8px;font-family:${GM};font-size:9px;color:${C.dim};">
-              ${item.source?`<span>${esc(item.source)}</span><span>·</span>`:''}
-              <span>${daysLabel}</span>
-              ${item.company?`<span>·</span><span style="color:${tagColor};">${esc(item.company)}</span>`:''}
-            </div>
-          </div>`;
-        }).join('')}
+      <div style="display:flex;gap:6px;font-family:${GM};font-size:9px;color:rgba(255,255,255,0.25);margin-top:12px;">
+        ${item.source?`<span>${esc(item.source)}</span><span>·</span>`:''}
+        <span>${daysLabel(item.daysAgo||0)}</span>
+      </div>
+    </div>`;
+  };
+
+  const featuredCard = featured ? `
+    <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:32px;display:flex;flex-direction:column;justify-content:flex-end;min-height:240px;grid-row:span 2;position:relative;overflow:hidden;">
+      <div style="position:absolute;top:0;left:0;right:0;bottom:0;background:linear-gradient(135deg,rgba(0,153,255,0.08) 0%,rgba(0,0,0,0) 60%);pointer-events:none;"></div>
+      <div>
+        <div style="font-family:${GM};font-size:8px;letter-spacing:0.14em;color:${C.blue};margin-bottom:14px;text-transform:uppercase;">${esc(featured.company||'Featured')}</div>
+        <div style="font-family:${GF};font-size:20px;font-weight:700;color:#fff;line-height:1.35;margin-bottom:14px;">${esc(featured.headline)}</div>
+        <div style="font-family:${GF};font-size:13px;color:rgba(255,255,255,0.4);line-height:1.6;margin-bottom:16px;">${esc(featured.brief||'')}</div>
+        <div style="display:flex;gap:8px;font-family:${GM};font-size:9px;color:rgba(255,255,255,0.3);">
+          ${featured.source?`<span>${esc(featured.source)}</span><span>·</span>`:''}
+          <span>${daysLabel(featured.daysAgo||0)}</span>
+        </div>
+      </div>
+    </div>` : '';
+
+  return `
+    <div class="section-full" data-nav-bg="rgba(2,8,20,0.92)" style="background:#020814;padding:80px 48px;animation:fadeInUp 0.6s ease forwards;opacity:0;">
+      <div class="section-inner">
+        <!-- Eyebrow -->
+        <div class="section-eyebrow" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);color:#f06a35;">⚡ RADAR</div>
+        <!-- Big editorial title -->
+        <div class="section-big-title">What the web<br>is saying.</div>
+
+        <!-- Sub-header row -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+          <span style="background:rgba(240,106,53,0.12);color:#f06a35;padding:3px 10px;border-radius:100px;font-family:${GM};font-size:8px;letter-spacing:0.1em;">PERPLEXITY · ${total} SOURCES</span>
+          <span style="font-family:${GM};font-size:9px;color:${C.dim};">past 7 days</span>
+        </div>
+
+        <!-- Card grid -->
+        <div style="display:grid;grid-template-columns:1fr 2fr 1fr;gap:10px;align-items:stretch;">
+          <!-- Left column -->
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            ${leftCards.map((item,i)=>smallCard(item, i + 1 >= clientNews.length)).join('')}
+          </div>
+          <!-- Center featured -->
+          ${featuredCard}
+          <!-- Right column -->
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            ${rightCards.map((item,i)=>smallCard(item, i + 3 >= clientNews.length)).join('')}
+            ${rest.length?`<div style="font-family:${GM};font-size:9px;color:${C.dim};text-align:center;padding:8px;">+${rest.length} more sources</div>`:''}
+          </div>
+        </div>
       </div>
     </div>`;
 }
 
-// ─── REPORT CARD ──────────────────────────────────────────────────────────────
+// ─── REPORT CARD — Full-bleed section design ──────────────────────────────────
 function renderReportCard(title, body, delay) {
-  const svgIcon = getSectionIcon(title);
-  let bodyHtml;
-  if (title==='THIS WEEK IN CLIENT INDUSTRIES')    bodyHtml=renderIndustrySection(body);
-  else if (title==='DESIGN SIGNALS WORTH WATCHING') bodyHtml=renderDesignSignals(body);
-  else                                              bodyHtml=renderGenericBody(body);
+  const design = SECTION_DESIGN[title];
+  if (design) {
+    let bodyHtml;
+    if (title==='THIS WEEK IN CLIENT INDUSTRIES')    bodyHtml=renderIndustrySection(body, design.accent);
+    else if (title==='DESIGN SIGNALS WORTH WATCHING') bodyHtml=renderDesignSignals(body, design.accent);
+    else                                              bodyHtml=renderGenericBody(body);
+    return `
+      <div class="section-full" data-nav-bg="rgba(${design.bg.slice(1).match(/.{2}/g).map(h=>parseInt(h,16)).join(',')},0.92)" style="background:${design.bg};padding:80px 48px;animation:fadeInUp 0.6s ease ${delay}ms forwards;opacity:0;">
+        <div class="section-inner">
+          <div class="section-eyebrow" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);color:${design.accent};">${design.tag}</div>
+          <div class="section-big-title">${design.headline}</div>
+          ${bodyHtml}
+        </div>
+      </div>`;
+  }
+  // Fallback for unknown sections
   return `
     <div style="background:${C.card};border:1px solid ${C.border};border-radius:8px;overflow:hidden;margin-bottom:10px;animation:fadeInUp 0.5s ease ${delay}ms forwards;opacity:0;">
       <div style="padding:12px 20px;border-bottom:1px solid ${C.border};display:flex;align-items:center;gap:9px;">
-        <span style="color:${C.dim};display:flex;align-items:center;">${svgIcon||'◦'}</span>
-        <span style="font-family:${GM};font-size:9px;font-weight:500;letter-spacing:0.14em;color:${C.dim};text-transform:uppercase;">${esc(title)}</span>
+        <span style="font-family:${GM};font-size:9px;font-weight:500;letter-spacing:0.14em;color:${C.dim};">${esc(title)}</span>
       </div>
-      ${bodyHtml}
+      <div style="padding:24px;font-family:${GF};font-size:14px;line-height:1.78;color:${C.muted};">${parseMd(body)}</div>
     </div>`;
 }
 
@@ -590,10 +685,57 @@ function renderBentoGrid(sections) {
 }
 
 function renderSectionsWithBento(sections) {
-  const bentoSet=new Set(['WHAT COMPETITORS ARE DOING','ONE THING TO BRING UP WITH A CLIENT THIS WEEK','STUDIO TOOL ALERT']);
-  return renderLiveSignals()+
-    sections.filter(s=>!bentoSet.has(s.title)).map((s,i)=>renderReportCard(s.title,s.body,i*70)).join('')+
-    (sections.filter(s=>bentoSet.has(s.title)).length?renderBentoGrid(sections.filter(s=>bentoSet.has(s.title))):'');
+  const soloSet = new Set(['WHAT COMPETITORS ARE DOING','STUDIO TOOL ALERT']);
+  const moveTitle = 'ONE THING TO BRING UP WITH A CLIENT THIS WEEK';
+  // Render in order: Live Signals, main sections, then move/competitors/tool
+  const mainSections = sections.filter(s=>!soloSet.has(s.title)&&s.title!==moveTitle);
+  const moveSec = sections.find(s=>s.title===moveTitle);
+  const soloSections = sections.filter(s=>soloSet.has(s.title));
+  return renderLiveSignals() +
+    mainSections.map((s,i)=>renderReportCard(s.title,s.body,i*80)).join('') +
+    (moveSec ? renderReportCard(moveSec.title, moveSec.body, 0) : '') +
+    (soloSections.length ? renderSoloBentoSection(soloSections) : '');
+}
+
+function renderSoloBentoSection(sections) {
+  const find = t => sections.find(s=>s.title===t);
+  const competitors = find('WHAT COMPETITORS ARE DOING');
+  const tool = find('STUDIO TOOL ALERT');
+  const compDesign = SECTION_DESIGN['WHAT COMPETITORS ARE DOING'];
+  const toolDesign = SECTION_DESIGN['STUDIO TOOL ALERT'];
+
+  // Parse competitors body — bold only brand names (lines starting with **)
+  function renderCompBody(body) {
+    return body.split('\n').map(l=>{
+      if(!l.trim()) return '<div style="height:10px;"></div>';
+      // Lines starting with ** are brand names — bold them, strip **
+      if(l.startsWith('**')) {
+        const name = l.replace(/\*\*/g,'').split('(')[0].trim();
+        const rest = l.includes('(')?l.slice(l.indexOf('(')):l.replace(/\*\*/g,'').replace(name,'').trim();
+        return `<div style="font-size:13px;font-weight:700;color:#fff;line-height:1.5;margin-top:16px;margin-bottom:4px;">${esc(name)}<span style="font-weight:400;color:${C.dim};font-size:12px;"> ${esc(rest.replace(/\*\*/g,''))}</span></div>`;
+      }
+      return `<div style="font-family:${GF};font-size:14px;color:rgba(255,255,255,0.5);line-height:1.7;">${parseMd(l)}</div>`;
+    }).join('');
+  }
+
+  return `
+    <div class="section-full" style="background:${compDesign.bg};padding:80px 48px;animation:fadeInUp 0.6s ease forwards;opacity:0;">
+      <div class="section-inner">
+        <div class="section-eyebrow" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);color:${compDesign.accent};">MORE INTELLIGENCE</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+          ${competitors?`
+          <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:32px;">
+            <div style="font-family:${GM};font-size:9px;letter-spacing:0.14em;color:${compDesign.accent};margin-bottom:16px;">${compDesign.tag}</div>
+            ${renderCompBody(competitors.body)}
+          </div>`:''}
+          ${tool?`
+          <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(215,230,65,0.1);border-radius:12px;padding:32px;">
+            <div style="font-family:${GM};font-size:9px;letter-spacing:0.14em;color:${toolDesign.accent};margin-bottom:16px;">${toolDesign.tag}</div>
+            <div style="font-family:${GF};font-size:14px;color:rgba(255,255,255,0.5);line-height:1.72;">${parseMd(tool.body)}</div>
+          </div>`:''}
+        </div>
+      </div>
+    </div>`;
 }
 
 // ─── SCAN LOG ─────────────────────────────────────────────────────────────────
@@ -627,6 +769,141 @@ function renderScanLog() {
       </div>
     </div>
     ${rows}
+  </div>`;
+}
+
+// ─── AUTO-PILOT FULL-BLEED SECTION ───────────────────────────────────────────
+function renderAutoPilotSection() {
+  const on = state.autoPilotEnabled;
+  const expanded = state.autoPilotExpanded;
+  const log = state.autoPilotLog;
+  const sim = state.autoPilotSimulating;
+  const sent = state.autoPilotJustSent;
+  const now = new Date();
+  const daysUntilMonday = (1 + 7 - now.getDay()) % 7 || 7;
+  const nextMonday = new Date(now); nextMonday.setDate(now.getDate() + daysUntilMonday);
+  const nextLabel = nextMonday.toLocaleDateString('en-US',{month:'long',day:'numeric'}) + ' · 8:00 AM';
+
+  return `
+  <div class="section-full" style="background:#0a1200;border-top:1px solid rgba(215,230,65,0.1);border-bottom:1px solid rgba(215,230,65,0.1);">
+    <!-- COLLAPSED HEADER — always visible -->
+    <div style="padding:28px 48px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;" id="autopilot-header">
+      <div style="display:flex;align-items:center;gap:16px;">
+        <span style="font-size:18px;">⚡</span>
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-family:${GM};font-size:11px;font-weight:600;letter-spacing:0.12em;color:${C.lime};">AUTO-PILOT</span>
+            ${on?`<span style="background:rgba(215,230,65,0.12);color:${C.lime};padding:2px 8px;border-radius:100px;font-family:${GM};font-size:8px;letter-spacing:0.1em;">ACTIVE</span>`:`<span style="background:rgba(255,255,255,0.05);color:${C.dim};padding:2px 8px;border-radius:100px;font-family:${GM};font-size:8px;letter-spacing:0.1em;">OFF</span>`}
+            ${state.demoMode?`<span style="background:rgba(216,92,224,0.1);color:#d85ce0;padding:2px 8px;border-radius:100px;font-family:${GM};font-size:8px;letter-spacing:0.1em;">DEMO</span>`:''}
+          </div>
+          <div style="font-family:${GF};font-size:13px;color:rgba(255,255,255,0.4);margin-top:3px;">
+            ${on?`Next run: ${nextLabel} · ${state.clients.length} clients · Slack`:'Enable to send drops to Slack automatically every Monday at 8am'}
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;">
+        <button id="autopilot-toggle" style="width:44px;height:24px;border-radius:100px;border:none;cursor:pointer;position:relative;background:${on?C.lime:'rgba(255,255,255,0.08)'};transition:background 0.25s;flex-shrink:0;">
+          <span style="position:absolute;top:3px;width:18px;height:18px;border-radius:50%;background:${on?'#000':'#fff'};transition:left 0.25s;left:${on?'23px':'3px'};"></span>
+        </button>
+        <button id="autopilot-expand" style="background:rgba(215,230,65,0.08);border:1px solid rgba(215,230,65,0.2);color:${C.lime};padding:6px 14px;border-radius:100px;font-family:${GM};font-size:9px;letter-spacing:0.1em;cursor:pointer;transition:all 0.15s;">
+          ${expanded?'COLLAPSE ↑':'EXPAND ↓'}
+        </button>
+      </div>
+    </div>
+
+    <!-- EXPANDED CONTENT -->
+    ${expanded?`
+    <div style="padding:0 48px 32px;border-top:1px solid rgba(215,230,65,0.08);">
+      <div style="display:grid;grid-template-columns:auto auto 1fr;gap:12px;margin-top:24px;margin-bottom:24px;align-items:start;">
+        <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:16px 24px;">
+          <div style="font-family:${GM};font-size:8px;color:${C.dim};letter-spacing:0.1em;margin-bottom:6px;">SCHEDULE</div>
+          <div style="font-size:15px;font-weight:600;">Every Monday</div>
+          <div style="font-family:${GM};font-size:10px;color:${C.dim};margin-top:2px;">8:00 AM CST</div>
+        </div>
+        <div style="background:rgba(215,230,65,0.06);border:1px solid rgba(215,230,65,0.15);border-radius:10px;padding:16px 24px;">
+          <div style="font-family:${GM};font-size:8px;color:${C.lime};letter-spacing:0.1em;margin-bottom:6px;">NEXT RUN</div>
+          <div style="font-size:15px;font-weight:600;color:${C.lime};">${nextLabel}</div>
+          <div style="font-family:${GM};font-size:10px;color:${C.dim};margin-top:2px;">${state.clients.length} clients · Slack</div>
+        </div>
+        ${state.demoMode?`
+        <div style="display:flex;align-items:center;justify-content:flex-end;">
+          <button id="autopilot-simulate" style="padding:12px 24px;border-radius:8px;cursor:${sim?'default':'pointer'};background:${sent?'rgba(215,230,65,0.15)':sim?'rgba(255,255,255,0.04)':'rgba(215,230,65,0.08)'};border:1px solid ${sent||sim?C.lime:'rgba(215,230,65,0.25)'};font-family:${GM};font-size:10px;letter-spacing:0.08em;color:${sent?C.lime:sim?C.dim:C.lime};transition:all 0.2s;" ${sim?'disabled':''}>
+            ${sent?'✓ DROP SENT':sim?'RUNNING…':'▶ SIMULATE RUN'}
+          </button>
+        </div>`:'<div></div>'}
+      </div>
+      <div style="font-family:${GM};font-size:8px;color:${C.dim};letter-spacing:0.1em;margin-bottom:10px;">RUN LOG</div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        ${log.map(entry=>`
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.05);border-radius:8px;">
+          <span style="font-family:${GM};font-size:8px;padding:2px 8px;border-radius:100px;flex-shrink:0;background:${entry.status==='sent'?'rgba(215,230,65,0.1)':'rgba(248,113,113,0.1)'};color:${entry.status==='sent'?C.lime:'#f87171'};">${entry.status==='sent'?'SENT':'FAILED'}</span>
+          <span style="font-family:${GM};font-size:9px;color:${C.dim};flex:1;">${esc(entry.date)} · ${esc(entry.time)}</span>
+          <span style="font-family:${GM};font-size:9px;color:rgba(255,255,255,0.25);">${entry.note?esc(entry.note):entry.clients+' clients'}</span>
+        </div>`).join('')}
+      </div>
+    </div>`:''}
+  </div>`;
+}
+
+// ─── SLACK + AUTOPILOT FULL-BLEED SECTION ────────────────────────────────────
+function renderSlackAndAutoPilot() {
+  return `
+  <div class="section-full" style="background:#000;padding:80px 48px;border-top:1px solid rgba(255,255,255,0.06);">
+    <div class="section-inner">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:start;">
+        <!-- LEFT: info + buttons -->
+        <div>
+          <div style="font-family:${GM};font-size:9px;letter-spacing:0.14em;color:${C.dim};margin-bottom:20px;">💬 DELIVER</div>
+          <div style="font-size:clamp(36px,4vw,56px);font-weight:800;letter-spacing:-0.04em;line-height:1;margin-bottom:20px;">Send to Slack.<br>Every Monday.</div>
+          <div style="font-family:${GF};font-size:15px;color:${C.muted};line-height:1.65;margin-bottom:32px;">Auto-pilot sends the drop to #lab-ops at 8am — no clicks needed. The team wakes up to fresh intelligence.</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            ${state.slackWebhook?`
+            <button id="slack-send" style="padding:13px 28px;background:${state.slackSent?C.teal:state.slackSending?'rgba(0,230,197,0.2)':C.teal};color:${state.slackSent||!state.slackSending?'#000':'#fff'};border:none;border-radius:8px;font-family:${GF};font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px;transition:all 0.2s;">
+              <span style="display:flex;">${ICON_SLACK}</span>${state.slackSent?'SENT!':state.slackSending?'SENDING…':'SEND TO SLACK'}
+            </button>
+            <button id="slack-copy" style="padding:13px 24px;background:${state.slackCopied?C.teal:'transparent'};color:${state.slackCopied?'#000':C.muted};border:1px solid ${C.border};border-radius:8px;font-family:${GM};font-size:10px;letter-spacing:0.08em;cursor:pointer;transition:all 0.2s;">
+              ${state.slackCopied?'COPIED!':'COPY'}
+            </button>`:`
+            <button id="connect-slack-btn" style="padding:13px 28px;background:rgba(0,230,197,0.08);border:1px solid rgba(0,230,197,0.3);color:${C.teal};border-radius:8px;font-family:${GM};font-size:10px;letter-spacing:0.08em;cursor:pointer;display:flex;align-items:center;gap:8px;">
+              <span style="display:flex;">${ICON_SLACK}</span> CONNECT SLACK
+            </button>`}
+          </div>
+          ${state.showWebhookInput?`
+          <div style="margin-top:20px;background:rgba(0,230,197,0.04);border:1px solid rgba(0,230,197,0.15);border-radius:10px;padding:20px;">
+            <div style="font-family:${GM};font-size:9px;color:${C.teal};letter-spacing:0.12em;margin-bottom:10px;">CONNECT SLACK WEBHOOK</div>
+            <div style="display:flex;gap:8px;">
+              <input id="webhook-input" placeholder="https://hooks.slack.com/services/..." value="${esc(state.slackWebhook)}"
+                style="flex:1;padding:10px 14px;border:1px solid rgba(0,230,197,0.3);border-radius:6px;font-family:${GM};font-size:11px;background:#000;color:#fff;" />
+              <button id="save-webhook-btn" style="padding:10px 18px;background:${C.teal};border:none;border-radius:6px;font-family:${GF};font-size:12px;font-weight:700;color:#000;cursor:pointer;">Save</button>
+            </div>
+          </div>`:(state.slackWebhook?`
+          <div style="display:flex;align-items:center;gap:8px;margin-top:16px;">
+            <div style="width:5px;height:5px;border-radius:50%;background:${C.teal};"></div>
+            <span style="font-family:${GM};font-size:9px;color:${C.dim};">Connected to Slack</span>
+            <button id="disconnect-slack-btn" style="background:none;border:none;color:${C.dim};cursor:pointer;font-family:${GM};font-size:9px;margin-left:6px;text-decoration:underline;">disconnect</button>
+          </div>`:'')}
+          <div style="margin-top:20px;display:flex;align-items:center;gap:8px;">
+            <span style="font-size:12px;">🔗</span>
+            <span style="font-family:${GM};font-size:9px;color:${C.dim};">REPORT LINK</span>
+            ${state.siteUrl
+              ?`<span style="font-family:${GM};font-size:9px;color:${C.teal};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px;">${esc(state.siteUrl)}</span>
+                <button id="edit-site-url-btn" style="background:none;border:none;color:${C.dim};cursor:pointer;font-family:${GM};font-size:9px;text-decoration:underline;">edit</button>
+                <button id="clear-site-url-btn" style="background:none;border:none;color:${C.dim};cursor:pointer;font-family:${GM};font-size:9px;text-decoration:underline;">remove</button>`
+              :`<button id="add-site-url-btn" style="background:none;border:none;color:${C.dim};cursor:pointer;font-family:${GM};font-size:9px;text-decoration:underline;">+ add link</button>`}
+          </div>
+          ${state.showSiteUrlInput?`
+          <div style="margin-top:12px;display:flex;gap:8px;">
+            <input id="site-url-input" placeholder="https://your-report.vercel.app" value="${esc(state.siteUrl)}"
+              style="flex:1;padding:9px 12px;border:1px solid ${C.border};border-radius:6px;font-family:${GM};font-size:11px;background:#000;color:#fff;" />
+            <button id="save-site-url-btn" style="padding:9px 14px;background:${C.teal};border:none;border-radius:6px;font-family:${GF};font-size:12px;font-weight:700;color:#000;cursor:pointer;">Save</button>
+          </div>`:''}
+        </div>
+        <!-- RIGHT: slack card -->
+        <div>
+          ${renderSlackPreview()}
+        </div>
+      </div>
+    </div>
   </div>`;
 }
 
@@ -899,49 +1176,102 @@ function renderAutoPilot() {
 
 // ─── SETUP SCREEN ─────────────────────────────────────────────────────────────
 function renderSetup() {
+  const LOGO_SVG = `<svg height="22" viewBox="0 0 1320 230" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:auto;opacity:0.85;"><path d="M519.12 45.1128C529.809 45.1128 539.496 46.4362 548.18 49.0829C556.865 51.7297 564.276 55.5137 570.414 60.435C576.594 65.3563 581.353 71.3528 584.694 78.4246C588.034 85.4964 589.704 93.4573 589.704 102.307H564.026C564.026 97.1379 562.919 92.4854 560.706 88.3499C558.535 84.2143 555.466 80.6991 551.5 77.8043C547.533 74.868 542.773 72.6141 537.22 71.0426C531.709 69.4711 525.613 68.6854 518.932 68.6854C515.216 68.6854 511.5 68.9542 507.784 69.4918C504.068 69.9881 500.498 70.7738 497.074 71.8491C493.692 72.883 490.54 74.2063 487.617 75.8192C484.694 77.4321 482.168 79.3344 480.039 81.5262C477.91 83.7181 476.219 86.2201 474.966 89.0322C473.755 91.8031 473.15 94.884 473.15 98.2752C473.15 102.742 474.235 106.36 476.406 109.131C478.578 111.902 481.667 114.176 485.676 115.955C489.684 117.692 494.548 119.098 500.268 120.173C505.989 121.248 512.398 122.323 519.496 123.399L528.765 124.763C532.565 125.342 536.427 125.963 540.352 126.624C544.318 127.245 548.243 128.01 552.126 128.92C556.009 129.788 559.788 130.863 563.462 132.145C567.136 133.386 570.602 134.875 573.859 136.612C577.157 138.349 580.163 140.416 582.877 142.815C585.633 145.172 587.992 147.922 589.955 151.065C591.917 154.167 593.441 157.724 594.527 161.735C595.654 165.705 596.218 170.213 596.218 175.258C596.218 181.379 595.383 187.003 593.712 192.131C592.042 197.218 589.641 201.788 586.51 205.841C583.42 209.893 579.662 213.429 575.237 216.448C570.811 219.467 565.821 221.99 560.268 224.016C554.715 226.001 548.661 227.49 542.105 228.483C535.55 229.475 528.619 229.972 521.312 229.972C509.287 229.972 498.515 228.669 488.995 226.063C479.475 223.417 471.396 219.591 464.757 214.587C458.16 209.542 453.108 203.38 449.601 196.101C446.093 188.782 444.34 180.469 444.34 171.164H470.018C470.018 176.664 471.208 181.606 473.588 185.99C475.968 190.332 479.35 194.034 483.734 197.094C488.16 200.113 493.504 202.429 499.767 204.042C506.072 205.613 513.128 206.399 520.936 206.399C525.404 206.399 529.725 206.13 533.901 205.593C538.118 205.055 542.064 204.228 545.738 203.111C549.412 201.953 552.752 200.526 555.759 198.831C558.807 197.094 561.416 195.068 563.587 192.752C565.759 190.394 567.45 187.727 568.66 184.749C569.871 181.772 570.477 178.443 570.477 174.762C570.477 171.495 569.976 168.662 568.974 166.264C568.013 163.865 566.614 161.797 564.777 160.06C562.94 158.282 560.727 156.793 558.139 155.594C555.55 154.395 552.627 153.381 549.37 152.554C546.114 151.686 542.585 150.941 538.786 150.321C534.986 149.659 530.957 148.998 526.698 148.336L515.049 146.599C509.955 145.813 504.736 144.986 499.392 144.118C494.047 143.208 488.87 142.029 483.859 140.582C478.891 139.134 474.193 137.335 469.768 135.185C465.342 133.034 461.48 130.326 458.181 127.059C454.883 123.75 452.273 119.801 450.352 115.21C448.432 110.578 447.471 105.12 447.471 98.8335C447.471 92.9197 448.327 87.4814 450.039 82.5188C451.793 77.5561 454.235 73.0897 457.367 69.1196C460.498 65.1495 464.256 61.6756 468.64 58.698C473.024 55.6791 477.868 53.1771 483.17 51.192C488.473 49.1656 494.152 47.6561 500.206 46.6636C506.302 45.6297 512.607 45.1128 519.12 45.1128Z" fill="#EFF1F3"/><path d="M748.953 73.0277H688.076V226.25H661.772V73.0277H600.895V48.8348H748.953V73.0277Z" fill="#EFF1F3"/><path d="M761.766 48.8348H788.071V151.81C788.071 160.37 789.177 168 791.39 174.7C793.645 181.4 796.902 187.065 801.161 191.697C805.419 196.288 810.659 199.782 816.881 202.181C823.102 204.579 830.2 205.779 838.175 205.779C846.15 205.779 853.248 204.579 859.469 202.181C865.69 199.782 870.93 196.288 875.189 191.697C879.448 187.065 882.684 181.4 884.897 174.7C887.152 168 888.279 160.37 888.279 151.81V48.8348H914.584V151.81C914.584 159.75 913.769 167.194 912.141 174.142C910.513 181.089 908.153 187.458 905.064 193.248C902.016 199.038 898.258 204.207 893.79 208.756C889.364 213.305 884.312 217.151 878.634 220.294C872.997 223.437 866.776 225.836 859.97 227.49C853.206 229.144 845.941 229.972 838.175 229.972C830.409 229.972 823.123 229.144 816.317 227.49C809.553 225.836 803.332 223.437 797.653 220.294C792.017 217.151 786.964 213.305 782.497 208.756C778.071 204.207 774.313 199.038 771.223 193.248C768.175 187.458 765.837 181.089 764.209 174.142C762.58 167.194 761.766 159.75 761.766 151.81V48.8348Z" fill="#EFF1F3"/><path d="M934.733 48.8348H993.668C1002.9 48.8348 1011.56 49.786 1019.66 51.6883C1027.8 53.5907 1035.27 56.3615 1042.08 60.0007C1048.93 63.5987 1055.04 68.003 1060.43 73.2138C1065.82 78.3832 1070.37 84.2557 1074.08 90.8312C1077.84 97.4067 1080.7 104.623 1082.66 112.481C1084.67 120.297 1085.67 128.651 1085.67 137.542C1085.67 146.434 1084.67 154.808 1082.66 162.666C1080.7 170.482 1077.84 177.678 1074.08 184.253C1070.37 190.787 1065.82 196.66 1060.43 201.871C1055.04 207.081 1048.93 211.486 1042.08 215.084C1035.27 218.682 1027.8 221.452 1019.66 223.396C1011.56 225.298 1002.9 226.25 993.668 226.25H934.733V48.8348ZM993.73 202.057C1003.96 202.057 1013.12 200.589 1021.22 197.652C1029.37 194.675 1036.26 190.415 1041.89 184.873C1047.53 179.332 1051.85 172.57 1054.86 164.589C1057.86 156.607 1059.37 147.592 1059.37 137.542C1059.37 127.493 1057.86 118.477 1054.86 110.496C1051.85 102.514 1047.53 95.7525 1041.89 90.2109C1036.26 84.6693 1029.37 80.4303 1021.22 77.4941C1013.12 74.5165 1003.96 73.0277 993.73 73.0277H960.411V202.057H993.73Z" fill="#EFF1F3"/><path d="M1131.31 226.25H1105.01V48.8348H1131.31V226.25Z" fill="#EFF1F3"/><path d="M1150.84 137.542C1150.84 128.361 1151.75 119.718 1153.59 111.612C1155.43 103.465 1158.08 95.98 1161.55 89.1563C1165.05 82.2913 1169.29 76.15 1174.26 70.7325C1179.23 65.2736 1184.84 60.6624 1191.11 56.8991C1197.37 53.0944 1204.22 50.1788 1211.65 48.1524C1219.08 46.126 1226.99 45.1128 1235.39 45.1128C1243.78 45.1128 1251.69 46.126 1259.12 48.1524C1266.55 50.1788 1273.4 53.0944 1279.67 56.8991C1285.93 60.6624 1291.54 65.2736 1296.51 70.7325C1301.52 76.15 1305.76 82.2913 1309.23 89.1563C1312.69 95.98 1315.34 103.465 1317.18 111.612C1319.06 119.718 1320 128.361 1320 137.542C1320 146.682 1319.06 155.325 1317.18 163.472C1315.34 171.619 1312.69 179.125 1309.23 185.99C1305.76 192.814 1301.52 198.955 1296.51 204.414C1291.54 209.831 1285.93 214.443 1279.67 218.247C1273.4 222.011 1266.55 224.906 1259.12 226.932C1251.69 228.958 1243.78 229.972 1235.39 229.972C1226.99 229.972 1219.08 228.958 1211.65 226.932C1204.22 224.906 1197.37 222.011 1191.11 218.247C1184.84 214.443 1179.23 209.831 1174.26 204.414C1169.29 198.955 1165.05 192.814 1161.55 185.99C1158.08 179.125 1155.43 171.619 1153.59 163.472C1151.75 155.325 1150.84 146.682 1150.84 137.542ZM1177.14 137.542C1177.14 148.212 1178.46 157.765 1181.09 166.201C1183.76 174.638 1187.6 181.792 1192.61 187.665C1197.62 193.496 1203.72 197.983 1210.9 201.126C1218.12 204.228 1226.28 205.779 1235.39 205.779C1244.49 205.779 1252.63 204.228 1259.81 201.126C1267.04 197.983 1273.15 193.496 1278.16 187.665C1283.17 181.792 1287.01 174.638 1289.69 166.201C1292.36 157.765 1293.69 148.212 1293.69 137.542C1293.69 126.872 1292.36 117.319 1289.69 108.883C1287.01 100.446 1283.17 93.3125 1278.16 87.4814C1273.15 81.609 1267.04 77.1219 1259.81 74.0202C1252.63 70.8772 1244.49 69.3057 1235.39 69.3057C1226.28 69.3057 1218.12 70.8772 1210.9 74.0202C1203.72 77.1219 1197.62 81.609 1192.61 87.4814C1187.6 93.3125 1183.76 100.446 1181.09 108.883C1178.46 117.319 1177.14 126.872 1177.14 137.542Z" fill="#EFF1F3"/><path d="M430.804 208.923C429.18 202.1 423.103 197.335 416.034 197.335C414.865 197.335 413.682 197.472 412.533 197.738C404.385 199.645 399.319 207.765 401.241 215.836C402.866 222.658 408.943 227.423 416.011 227.423C417.18 227.423 418.358 227.286 419.51 227.02C427.661 225.113 432.724 216.993 430.804 208.92V208.923Z" fill="#EFF1F3"/><path d="M400.748 135.39C399.312 120.627 394.149 106.222 385.201 93.863C376.7 82.1198 365.096 72.5987 351.59 67.045C339.155 61.9311 325.402 60.0837 311.818 61.6984C298.177 63.3188 285.066 68.3987 273.892 76.3873L269.37 79.2848L293.934 0.00283788H262.299L239.489 73.6345C235.183 68.952 229.401 65.2259 222.23 62.5498C210.898 58.3213 197.466 56.7264 183.398 57.9467C170.427 59.0705 157.737 62.4533 146.698 67.7261C139.555 71.14 133.139 75.7261 127.085 81.7481C121.464 87.3415 116.808 93.5764 113.378 98.3894C113.378 98.3894 138.082 115.655 138.085 115.655C137.612 115.397 149.305 102.538 150.548 101.454C155.121 97.4643 160.459 94.5412 166.103 92.2794C177.848 87.5714 195.345 84.6484 207.726 88.9478C212.62 90.6477 217.018 94.8279 217.296 99.9559C218.576 123.357 165.542 124.155 151.162 129.748C136.836 135.319 123.957 144.286 114.097 156.035C99.2673 173.707 67.1801 213.08 40.7861 191.197C33.7492 185.362 30.7551 175.986 29.7494 166.95C27.9987 151.194 31.2622 135.288 35.9382 120.128C42.4536 99.0081 51.7053 78.8477 61.5902 59.0961C63.4984 55.282 84.8841 12.4782 84.9672 12.5207L58.0889 0C45.0294 22.3228 25.8499 59.0251 13.4751 93.9651C6.39813 113.944 2.06024 132.032 0.581807 147.723C-1.30062 167.688 1.38979 184.479 8.5814 197.63C20.3516 219.156 37.4166 225.104 49.6567 226.301C51.4273 226.474 53.2267 226.56 55.0547 226.56C68.8935 226.56 96.9322 222.831 117.487 194.571C122.077 206.172 131.736 215.937 145.285 222.135C157.783 227.851 172.527 227.226 189.117 220.271C198.162 216.479 207.783 210.781 217.837 203.272L211.408 227.031H242.716L253.451 187.349C266.084 203.984 281.579 215.935 298.372 221.974C306.916 225.044 315.643 226.582 324.305 226.582C332.505 226.582 340.642 225.206 348.501 222.445C364.578 216.803 378.594 205.429 387.972 190.408C398.298 173.869 402.596 154.335 400.75 135.387L400.748 135.39ZM362.254 174.666C356.397 184.042 348.154 190.802 338.404 194.225C328.932 197.548 318.657 197.414 308.692 193.83C297.042 189.644 285.98 180.748 276.688 168.108C276.662 168.074 276.639 168.04 276.614 168.006C267.935 156.399 257.354 153.396 250.005 152.922C231.564 151.725 216.347 164.688 210.196 170.863C198.254 181.139 180.636 196.424 163.705 195.709C155.454 195.36 147.021 190.033 145.294 182.036C143.755 174.913 147.812 167.52 153.548 162.968C163.018 155.456 174.908 154.023 186.323 151.367C218.571 143.878 249.904 132.719 276.482 112.653C283.301 107.502 289.785 101.86 297.177 97.5551C310.156 90.0006 326.038 88.962 339.991 94.7002C367.228 105.901 376.623 138.673 367.153 164.648C365.881 168.139 364.219 171.51 362.248 174.666H362.257H362.254Z" fill="#EFF1F3"/></svg>`;
+
   return `
-    <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;">
-      <div class="fu" style="background:${C.card};border:1px solid ${C.border};border-radius:12px;padding:48px 44px;max-width:440px;width:100%;">
-        <div style="display:inline-flex;align-items:center;gap:6px;background:${C.surface};border:1px solid ${C.border};border-radius:100px;padding:4px 12px;margin-bottom:24px;">
-          <div style="width:6px;height:6px;border-radius:50%;background:${C.teal};animation:glowPulse 1.5s ease infinite;"></div>
-          <span style="font-family:${GM};font-size:9px;letter-spacing:0.14em;color:${C.muted};">THE LAB STUDIO</span>
-        </div>
-        <div style="font-family:'Geist',sans-serif;font-weight:700;font-size:32px;line-height:1;letter-spacing:-0.03em;color:#fff;margin-bottom:4px;">Monday</div>
-        <div style="font-family:'Geist',sans-serif;font-weight:700;font-size:32px;line-height:1;letter-spacing:-0.03em;color:${C.muted};margin-bottom:24px;">Intelligence Drop</div>
-        <!-- DEMO MODE — top, clear path -->
-        <button id="demo-btn" style="width:100%;padding:13px;background:rgba(216,92,224,0.08);border:1px solid rgba(216,92,224,0.25);border-radius:8px;font-family:${GF};font-size:13px;font-weight:600;color:#d85ce0;cursor:pointer;margin-bottom:6px;transition:all 0.15s ease;display:flex;align-items:center;justify-content:center;gap:8px;"
-          onmouseover="this.style.background='rgba(216,92,224,0.14)';this.style.borderColor='rgba(216,92,224,0.4)';"
-          onmouseout="this.style.background='rgba(216,92,224,0.08)';this.style.borderColor='rgba(216,92,224,0.25)';">
-          <span style="font-size:15px;">▶</span> Try Demo Mode — no API key needed
-        </button>
-        <div style="font-family:${GF};font-size:11px;color:${C.dim};text-align:center;margin-bottom:20px;">Explore the full interface with sample data instantly</div>
+    <div style="min-height:100vh;background:#000;display:flex;flex-direction:column;">
 
-        <!-- DIVIDER -->
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
-          <div style="flex:1;height:1px;background:${C.border};"></div>
-          <span style="font-family:${GM};font-size:9px;letter-spacing:0.12em;color:${C.dim};">OR CONNECT YOUR KEYS</span>
-          <div style="flex:1;height:1px;background:${C.border};"></div>
-        </div>
-
-        <!-- API KEYS -->
-        <div style="font-family:${GM};font-size:9px;letter-spacing:0.12em;color:${C.dim};margin-bottom:6px;text-transform:uppercase;">Anthropic API Key <span style="color:rgba(248,113,113,0.8);margin-left:4px;">REQUIRED</span></div>
-        <input id="api-key-input" type="password" placeholder="sk-ant-api03-..."
-          style="width:100%;padding:11px 14px;border:1px solid ${C.border};border-radius:6px;font-family:${GM};font-size:12px;background:${C.surface};color:#fff;margin-bottom:10px;transition:all 0.15s;" />
-        <div id="api-key-error" style="font-family:${GF};font-size:11px;color:#f87171;margin-bottom:10px;display:none;"></div>
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-          <span style="font-family:${GM};font-size:9px;letter-spacing:0.12em;color:${C.dim};text-transform:uppercase;">Perplexity API Key</span>
-          <span style="background:rgba(0,153,255,0.12);color:${C.blue};padding:2px 7px;border-radius:100px;font-family:${GM};font-size:7px;letter-spacing:0.1em;">OPTIONAL</span>
-          <span style="background:rgba(0,230,197,0.1);color:${C.teal};padding:2px 7px;border-radius:100px;font-family:${GM};font-size:7px;letter-spacing:0.1em;">✦ ENHANCED</span>
-        </div>
-        <input id="pplx-key-input" type="password" placeholder="pplx-..."
-          value="${esc(state.perplexityKey)}"
-          style="width:100%;padding:11px 14px;border:1px solid rgba(0,153,255,0.2);border-radius:6px;font-family:${GM};font-size:12px;background:rgba(0,153,255,0.04);color:#fff;margin-bottom:6px;transition:all 0.15s;" />
-        <div style="font-family:${GF};font-size:11px;color:${C.dim};line-height:1.5;margin-bottom:16px;">Searches the live web before each drop — real client news + design signals fed directly to Claude.</div>
-        <button id="activate-btn" class="run-btn"
-          style="width:100%;padding:12px;background:${C.blue};color:#fff;border:none;border-radius:6px;font-family:${GF};font-size:13px;font-weight:600;cursor:pointer;">
-          Activate Intelligence Drop →
+      <!-- TOP BAR -->
+      <div style="padding:20px 48px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.06);">
+        ${LOGO_SVG}
+        <button id="connect-keys-btn" style="background:none;border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.4);padding:7px 16px;border-radius:100px;font-family:${GM};font-size:9px;letter-spacing:0.1em;cursor:pointer;transition:all 0.15s;"
+          onmouseover="this.style.color='#fff';this.style.borderColor='rgba(255,255,255,0.3)'"
+          onmouseout="this.style.color='rgba(255,255,255,0.4)';this.style.borderColor='rgba(255,255,255,0.1)'">
+          CONNECT YOUR KEYS →
         </button>
       </div>
+
+      <!-- MAIN CONTENT -->
+      <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:60px 48px;">
+        <div style="max-width:640px;width:100%;text-align:center;">
+
+          <!-- Eyebrow -->
+          <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:100px;padding:5px 14px;margin-bottom:32px;">
+            <div style="width:5px;height:5px;border-radius:50%;background:${C.teal};animation:glowPulse 1.5s ease infinite;"></div>
+            <span style="font-family:${GM};font-size:9px;letter-spacing:0.14em;color:${C.muted};">WEEKLY AI BRIEFING AGENT</span>
+          </div>
+
+          <!-- Title -->
+          <div style="font-size:clamp(56px,9vw,96px);font-weight:800;line-height:0.92;letter-spacing:-0.04em;color:#fff;margin-bottom:16px;">
+            Monday<br><span style="color:rgba(255,255,255,0.3);">Intelligence</span><br>Drop.
+          </div>
+
+          <!-- Description -->
+          <div style="font-family:${GF};font-size:17px;color:rgba(255,255,255,0.4);line-height:1.65;margin-bottom:48px;max-width:480px;margin-left:auto;margin-right:auto;">
+            Researches your clients via Perplexity, tracks design signals, and delivers a sharp briefing to Slack — every Monday at 8am.
+          </div>
+
+          <!-- DEMO BUTTON -->
+          <button id="demo-btn" class="run-btn" style="
+            display:inline-flex;align-items:center;gap:12px;
+            padding:20px 48px;background:${C.lime};color:#000;
+            border:none;border-radius:10px;font-family:${GF};
+            font-size:17px;font-weight:800;cursor:pointer;
+            letter-spacing:-0.01em;margin-bottom:16px;
+            box-shadow:0 0 60px rgba(215,230,65,0.2);">
+            <span style="font-size:20px;">▶</span> Start the demo
+          </button>
+          <div style="font-family:${GF};font-size:12px;color:rgba(255,255,255,0.25);margin-bottom:40px;">No setup needed · Explore the full experience instantly</div>
+
+          <!-- Feature pills -->
+          <div style="display:flex;justify-content:center;flex-wrap:wrap;gap:8px;">
+            ${[
+              ['🔎','Perplexity live web research'],
+              ['📡','6 client intel sections'],
+              ['💬','Slack delivery'],
+              ['⚡','Auto-pilot'],
+            ].map(([icon,label])=>`
+              <div style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:100px;padding:5px 12px;">
+                <span style="font-size:12px;">${icon}</span>
+                <span style="font-family:${GF};font-size:11px;color:rgba(255,255,255,0.35);">${label}</span>
+              </div>`).join('')}
+          </div>
+
+        </div>
+      </div>
+
+      <!-- CONNECT KEYS FORM (hidden by default, shown when state.showConnectKeys) -->
+      ${state.showConnectKeys?`
+      <div style="border-top:1px solid rgba(255,255,255,0.06);padding:32px 48px;background:rgba(255,255,255,0.02);animation:fadeInUp 0.3s ease forwards;">
+        <div style="max-width:640px;margin:0 auto;">
+          <div style="font-family:${GM};font-size:10px;letter-spacing:0.12em;color:${C.dim};margin-bottom:20px;">CONNECT YOUR API KEYS</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+            <div>
+              <div style="font-family:${GM};font-size:9px;color:${C.dim};letter-spacing:0.1em;margin-bottom:6px;">ANTHROPIC API KEY <span style="color:rgba(248,113,113,0.8);">REQUIRED</span></div>
+              <input id="api-key-input" type="password" placeholder="sk-ant-api03-..."
+                style="width:100%;padding:10px 14px;border:1px solid ${C.border};border-radius:6px;font-family:${GM};font-size:11px;background:${C.surface};color:#fff;" />
+              <div id="api-key-error" style="font-family:${GF};font-size:11px;color:#f87171;margin-top:4px;display:none;"></div>
+            </div>
+            <div>
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+                <span style="font-family:${GM};font-size:9px;color:${C.dim};letter-spacing:0.1em;">PERPLEXITY KEY</span>
+                <span style="background:rgba(0,153,255,0.12);color:${C.blue};padding:1px 6px;border-radius:100px;font-family:${GM};font-size:7px;">OPTIONAL</span>
+              </div>
+              <input id="pplx-key-input" type="password" placeholder="pplx-..." value="${esc(state.perplexityKey)}"
+                style="width:100%;padding:10px 14px;border:1px solid rgba(0,153,255,0.2);border-radius:6px;font-family:${GM};font-size:11px;background:rgba(0,153,255,0.04);color:#fff;" />
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;">
+            <button id="activate-btn" class="run-btn" style="padding:11px 28px;background:${C.blue};color:#fff;border:none;border-radius:6px;font-family:${GF};font-size:13px;font-weight:600;cursor:pointer;">
+              Activate Intelligence Drop →
+            </button>
+            <button id="cancel-keys-btn" style="padding:11px 20px;background:transparent;border:1px solid ${C.border};border-radius:6px;font-family:${GF};font-size:13px;color:${C.dim};cursor:pointer;">
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>`:''}
+
     </div>`;
 }
 
@@ -953,9 +1283,18 @@ function renderMain() {
 
   return `
     <div style="position:sticky;top:0;z-index:100;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);background:rgba(0,0,0,0.85);border-bottom:1px solid ${C.border};padding:14px 40px;display:flex;justify-content:space-between;align-items:center;">
-      <div style="display:flex;align-items:center;gap:12px;">
-        <div style="font-family:${GF};font-size:13px;font-weight:600;color:#fff;letter-spacing:-0.01em;">The Lab Studio</div>
-        <span style="color:${C.dim};">·</span>
+      <div style="display:flex;align-items:center;gap:14px;">
+        <svg height="20" viewBox="0 0 1320 230" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:auto;opacity:0.9;">
+          <path d="M519.12 45.1128C529.809 45.1128 539.496 46.4362 548.18 49.0829C556.865 51.7297 564.276 55.5137 570.414 60.435C576.594 65.3563 581.353 71.3528 584.694 78.4246C588.034 85.4964 589.704 93.4573 589.704 102.307H564.026C564.026 97.1379 562.919 92.4854 560.706 88.3499C558.535 84.2143 555.466 80.6991 551.5 77.8043C547.533 74.868 542.773 72.6141 537.22 71.0426C531.709 69.4711 525.613 68.6854 518.932 68.6854C515.216 68.6854 511.5 68.9542 507.784 69.4918C504.068 69.9881 500.498 70.7738 497.074 71.8491C493.692 72.883 490.54 74.2063 487.617 75.8192C484.694 77.4321 482.168 79.3344 480.039 81.5262C477.91 83.7181 476.219 86.2201 474.966 89.0322C473.755 91.8031 473.15 94.884 473.15 98.2752C473.15 102.742 474.235 106.36 476.406 109.131C478.578 111.902 481.667 114.176 485.676 115.955C489.684 117.692 494.548 119.098 500.268 120.173C505.989 121.248 512.398 122.323 519.496 123.399L528.765 124.763C532.565 125.342 536.427 125.963 540.352 126.624C544.318 127.245 548.243 128.01 552.126 128.92C556.009 129.788 559.788 130.863 563.462 132.145C567.136 133.386 570.602 134.875 573.859 136.612C577.157 138.349 580.163 140.416 582.877 142.815C585.633 145.172 587.992 147.922 589.955 151.065C591.917 154.167 593.441 157.724 594.527 161.735C595.654 165.705 596.218 170.213 596.218 175.258C596.218 181.379 595.383 187.003 593.712 192.131C592.042 197.218 589.641 201.788 586.51 205.841C583.42 209.893 579.662 213.429 575.237 216.448C570.811 219.467 565.821 221.99 560.268 224.016C554.715 226.001 548.661 227.49 542.105 228.483C535.55 229.475 528.619 229.972 521.312 229.972C509.287 229.972 498.515 228.669 488.995 226.063C479.475 223.417 471.396 219.591 464.757 214.587C458.16 209.542 453.108 203.38 449.601 196.101C446.093 188.782 444.34 180.469 444.34 171.164H470.018C470.018 176.664 471.208 181.606 473.588 185.99C475.968 190.332 479.35 194.034 483.734 197.094C488.16 200.113 493.504 202.429 499.767 204.042C506.072 205.613 513.128 206.399 520.936 206.399C525.404 206.399 529.725 206.13 533.901 205.593C538.118 205.055 542.064 204.228 545.738 203.111C549.412 201.953 552.752 200.526 555.759 198.831C558.807 197.094 561.416 195.068 563.587 192.752C565.759 190.394 567.45 187.727 568.66 184.749C569.871 181.772 570.477 178.443 570.477 174.762C570.477 171.495 569.976 168.662 568.974 166.264C568.013 163.865 566.614 161.797 564.777 160.06C562.94 158.282 560.727 156.793 558.139 155.594C555.55 154.395 552.627 153.381 549.37 152.554C546.114 151.686 542.585 150.941 538.786 150.321C534.986 149.659 530.957 148.998 526.698 148.336L515.049 146.599C509.955 145.813 504.736 144.986 499.392 144.118C494.047 143.208 488.87 142.029 483.859 140.582C478.891 139.134 474.193 137.335 469.768 135.185C465.342 133.034 461.48 130.326 458.181 127.059C454.883 123.75 452.273 119.801 450.352 115.21C448.432 110.578 447.471 105.12 447.471 98.8335C447.471 92.9197 448.327 87.4814 450.039 82.5188C451.793 77.5561 454.235 73.0897 457.367 69.1196C460.498 65.1495 464.256 61.6756 468.64 58.698C473.024 55.6791 477.868 53.1771 483.17 51.192C488.473 49.1656 494.152 47.6561 500.206 46.6636C506.302 45.6297 512.607 45.1128 519.12 45.1128Z" fill="#EFF1F3"/>
+          <path d="M748.953 73.0277H688.076V226.25H661.772V73.0277H600.895V48.8348H748.953V73.0277Z" fill="#EFF1F3"/>
+          <path d="M761.766 48.8348H788.071V151.81C788.071 160.37 789.177 168 791.39 174.7C793.645 181.4 796.902 187.065 801.161 191.697C805.419 196.288 810.659 199.782 816.881 202.181C823.102 204.579 830.2 205.779 838.175 205.779C846.15 205.779 853.248 204.579 859.469 202.181C865.69 199.782 870.93 196.288 875.189 191.697C879.448 187.065 882.684 181.4 884.897 174.7C887.152 168 888.279 160.37 888.279 151.81V48.8348H914.584V151.81C914.584 159.75 913.769 167.194 912.141 174.142C910.513 181.089 908.153 187.458 905.064 193.248C902.016 199.038 898.258 204.207 893.79 208.756C889.364 213.305 884.312 217.151 878.634 220.294C872.997 223.437 866.776 225.836 859.97 227.49C853.206 229.144 845.941 229.972 838.175 229.972C830.409 229.972 823.123 229.144 816.317 227.49C809.553 225.836 803.332 223.437 797.653 220.294C792.017 217.151 786.964 213.305 782.497 208.756C778.071 204.207 774.313 199.038 771.223 193.248C768.175 187.458 765.837 181.089 764.209 174.142C762.58 167.194 761.766 159.75 761.766 151.81V48.8348Z" fill="#EFF1F3"/>
+          <path d="M934.733 48.8348H993.668C1002.9 48.8348 1011.56 49.786 1019.66 51.6883C1027.8 53.5907 1035.27 56.3615 1042.08 60.0007C1048.93 63.5987 1055.04 68.003 1060.43 73.2138C1065.82 78.3832 1070.37 84.2557 1074.08 90.8312C1077.84 97.4067 1080.7 104.623 1082.66 112.481C1084.67 120.297 1085.67 128.651 1085.67 137.542C1085.67 146.434 1084.67 154.808 1082.66 162.666C1080.7 170.482 1077.84 177.678 1074.08 184.253C1070.37 190.787 1065.82 196.66 1060.43 201.871C1055.04 207.081 1048.93 211.486 1042.08 215.084C1035.27 218.682 1027.8 221.452 1019.66 223.396C1011.56 225.298 1002.9 226.25 993.668 226.25H934.733V48.8348ZM993.73 202.057C1003.96 202.057 1013.12 200.589 1021.22 197.652C1029.37 194.675 1036.26 190.415 1041.89 184.873C1047.53 179.332 1051.85 172.57 1054.86 164.589C1057.86 156.607 1059.37 147.592 1059.37 137.542C1059.37 127.493 1057.86 118.477 1054.86 110.496C1051.85 102.514 1047.53 95.7525 1041.89 90.2109C1036.26 84.6693 1029.37 80.4303 1021.22 77.4941C1013.12 74.5165 1003.96 73.0277 993.73 73.0277H960.411V202.057H993.73Z" fill="#EFF1F3"/>
+          <path d="M1131.31 226.25H1105.01V48.8348H1131.31V226.25Z" fill="#EFF1F3"/>
+          <path d="M1150.84 137.542C1150.84 128.361 1151.75 119.718 1153.59 111.612C1155.43 103.465 1158.08 95.98 1161.55 89.1563C1165.05 82.2913 1169.29 76.15 1174.26 70.7325C1179.23 65.2736 1184.84 60.6624 1191.11 56.8991C1197.37 53.0944 1204.22 50.1788 1211.65 48.1524C1219.08 46.126 1226.99 45.1128 1235.39 45.1128C1243.78 45.1128 1251.69 46.126 1259.12 48.1524C1266.55 50.1788 1273.4 53.0944 1279.67 56.8991C1285.93 60.6624 1291.54 65.2736 1296.51 70.7325C1301.52 76.15 1305.76 82.2913 1309.23 89.1563C1312.69 95.98 1315.34 103.465 1317.18 111.612C1319.06 119.718 1320 128.361 1320 137.542C1320 146.682 1319.06 155.325 1317.18 163.472C1315.34 171.619 1312.69 179.125 1309.23 185.99C1305.76 192.814 1301.52 198.955 1296.51 204.414C1291.54 209.831 1285.93 214.443 1279.67 218.247C1273.4 222.011 1266.55 224.906 1259.12 226.932C1251.69 228.958 1243.78 229.972 1235.39 229.972C1226.99 229.972 1219.08 228.958 1211.65 226.932C1204.22 224.906 1197.37 222.011 1191.11 218.247C1184.84 214.443 1179.23 209.831 1174.26 204.414C1169.29 198.955 1165.05 192.814 1161.55 185.99C1158.08 179.125 1155.43 171.619 1153.59 163.472C1151.75 155.325 1150.84 146.682 1150.84 137.542ZM1177.14 137.542C1177.14 148.212 1178.46 157.765 1181.09 166.201C1183.76 174.638 1187.6 181.792 1192.61 187.665C1197.62 193.496 1203.72 197.983 1210.9 201.126C1218.12 204.228 1226.28 205.779 1235.39 205.779C1244.49 205.779 1252.63 204.228 1259.81 201.126C1267.04 197.983 1273.15 193.496 1278.16 187.665C1283.17 181.792 1287.01 174.638 1289.69 166.201C1292.36 157.765 1293.69 148.212 1293.69 137.542C1293.69 126.872 1292.36 117.319 1289.69 108.883C1287.01 100.446 1283.17 93.3125 1278.16 87.4814C1273.15 81.609 1267.04 77.1219 1259.81 74.0202C1252.63 70.8772 1244.49 69.3057 1235.39 69.3057C1226.28 69.3057 1218.12 70.8772 1210.9 74.0202C1203.72 77.1219 1197.62 81.609 1192.61 87.4814C1187.6 93.3125 1183.76 100.446 1181.09 108.883C1178.46 117.319 1177.14 126.872 1177.14 137.542Z" fill="#EFF1F3"/>
+          <path d="M430.804 208.923C429.18 202.1 423.103 197.335 416.034 197.335C414.865 197.335 413.682 197.472 412.533 197.738C404.385 199.645 399.319 207.765 401.241 215.836C402.866 222.658 408.943 227.423 416.011 227.423C417.18 227.423 418.358 227.286 419.51 227.02C427.661 225.113 432.724 216.993 430.804 208.92V208.923Z" fill="#EFF1F3"/>
+          <path d="M400.748 135.39C399.312 120.627 394.149 106.222 385.201 93.863C376.7 82.1198 365.096 72.5987 351.59 67.045C339.155 61.9311 325.402 60.0837 311.818 61.6984C298.177 63.3188 285.066 68.3987 273.892 76.3873L269.37 79.2848L293.934 0.00283788H262.299L239.489 73.6345C235.183 68.952 229.401 65.2259 222.23 62.5498C210.898 58.3213 197.466 56.7264 183.398 57.9467C170.427 59.0705 157.737 62.4533 146.698 67.7261C139.555 71.14 133.139 75.7261 127.085 81.7481C121.464 87.3415 116.808 93.5764 113.378 98.3894C113.378 98.3894 138.082 115.655 138.085 115.655C137.612 115.397 149.305 102.538 150.548 101.454C155.121 97.4643 160.459 94.5412 166.103 92.2794C177.848 87.5714 195.345 84.6484 207.726 88.9478C212.62 90.6477 217.018 94.8279 217.296 99.9559C218.576 123.357 165.542 124.155 151.162 129.748C136.836 135.319 123.957 144.286 114.097 156.035C99.2673 173.707 67.1801 213.08 40.7861 191.197C33.7492 185.362 30.7551 175.986 29.7494 166.95C27.9987 151.194 31.2622 135.288 35.9382 120.128C42.4536 99.0081 51.7053 78.8477 61.5902 59.0961C63.4984 55.282 84.8841 12.4782 84.9672 12.5207L58.0889 0C45.0294 22.3228 25.8499 59.0251 13.4751 93.9651C6.39813 113.944 2.06024 132.032 0.581807 147.723C-1.30062 167.688 1.38979 184.479 8.5814 197.63C20.3516 219.156 37.4166 225.104 49.6567 226.301C51.4273 226.474 53.2267 226.56 55.0547 226.56C68.8935 226.56 96.9322 222.831 117.487 194.571C122.077 206.172 131.736 215.937 145.285 222.135C157.783 227.851 172.527 227.226 189.117 220.271C198.162 216.479 207.783 210.781 217.837 203.272L211.408 227.031H242.716L253.451 187.349C266.084 203.984 281.579 215.935 298.372 221.974C306.916 225.044 315.643 226.582 324.305 226.582C332.505 226.582 340.642 225.206 348.501 222.445C364.578 216.803 378.594 205.429 387.972 190.408C398.298 173.869 402.596 154.335 400.75 135.387L400.748 135.39ZM362.254 174.666C356.397 184.042 348.154 190.802 338.404 194.225C328.932 197.548 318.657 197.414 308.692 193.83C297.042 189.644 285.98 180.748 276.688 168.108C276.662 168.074 276.639 168.04 276.614 168.006C267.935 156.399 257.354 153.396 250.005 152.922C231.564 151.725 216.347 164.688 210.196 170.863C198.254 181.139 180.636 196.424 163.705 195.709C155.454 195.36 147.021 190.033 145.294 182.036C143.755 174.913 147.812 167.52 153.548 162.968C163.018 155.456 174.908 154.023 186.323 151.367C218.571 143.878 249.904 132.719 276.482 112.653C283.301 107.502 289.785 101.86 297.177 97.5551C310.156 90.0006 326.038 88.962 339.991 94.7002C367.228 105.901 376.623 138.673 367.153 164.648C365.881 168.139 364.219 171.51 362.248 174.666H362.257H362.254Z" fill="#EFF1F3"/>
+        </svg>
+        <span style="color:rgba(255,255,255,0.15);">·</span>
         <div style="font-family:${GM};font-size:10px;color:${C.dim};letter-spacing:0.06em;">INTEL DROP</div>
       </div>
       <div style="display:flex;align-items:center;gap:12px;">
@@ -965,27 +1304,29 @@ function renderMain() {
         ${state.perplexityKey&&!state.demoMode?`<div style="display:flex;align-items:center;gap:5px;background:rgba(0,153,255,0.08);border:1px solid rgba(0,153,255,0.2);border-radius:100px;padding:3px 10px;"><div class="pulse-dot" style="width:4px;height:4px;border-radius:50%;background:${C.blue};"></div><span style="font-family:${GM};font-size:8px;letter-spacing:0.1em;color:${C.blue};">PERPLEXITY</span></div>`:''}
         ${state.history.length>0?`
         <button id="history-btn" style="background:none;border:1px solid ${C.border};border-radius:100px;padding:4px 10px;color:${C.dim};cursor:pointer;font-family:${GM};font-size:9px;letter-spacing:0.1em;display:flex;align-items:center;gap:5px;transition:all 0.15s ease;" onmouseover="this.style.color='#fff';this.style.borderColor='rgba(255,255,255,0.2)'" onmouseout="this.style.color='${C.dim}';this.style.borderColor='${C.border}'">
-          <span style="display:flex;">${ICON_HISTORY}</span> ${state.history.length}
+          <span style="display:flex;">${ICON_HISTORY}</span> PAST DROPS <span style="background:rgba(255,255,255,0.08);padding:1px 6px;border-radius:100px;font-size:8px;">${state.history.length}</span>
         </button>`:''}
-        <button id="reset-key-btn" style="background:none;border:none;color:${C.dim};cursor:pointer;font-family:${GM};font-size:9px;letter-spacing:0.1em;transition:color 0.15s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='${C.dim}'">
-          ${state.demoMode?'EXIT DEMO':'RESET KEY'}
+        <button id="settings-btn" style="background:none;border:1px solid ${C.border};border-radius:100px;padding:4px 12px;color:${C.dim};cursor:pointer;font-family:${GM};font-size:9px;letter-spacing:0.1em;display:flex;align-items:center;gap:5px;transition:all 0.15s;" onmouseover="this.style.color='#fff';this.style.borderColor='rgba(255,255,255,0.2)'" onmouseout="this.style.color='${C.dim}';this.style.borderColor='${C.border}'">
+          ⚙ ${state.demoMode?'EXIT DEMO':'SETTINGS'}
         </button>
       </div>
     </div>
 
 
-    <div style="max-width:800px;margin:0 auto;padding:60px 40px 100px;">
+    <div style="max-width:1400px;margin:0 auto;padding:72px 48px 100px;">
 
+      ${state.phase==='idle'?`
       <div class="fu1" style="margin-bottom:56px;">
         <div style="margin-bottom:20px;"><span style="font-family:${GM};font-size:9px;letter-spacing:0.16em;color:${C.dim};background:${C.surface};border:1px solid ${C.border};padding:4px 12px;border-radius:100px;">WEEKLY BRIEFING</span></div>
-        <div style="font-family:'Geist',sans-serif;font-weight:700;font-size:clamp(48px,8vw,80px);line-height:0.95;letter-spacing:-0.04em;color:#fff;margin-bottom:20px;">Monday<br><span style="color:${C.muted};">Intelligence</span><br>Drop</div>
+        <div style="font-family:'Geist',sans-serif;font-weight:800;font-size:clamp(64px,10vw,120px);line-height:0.92;letter-spacing:-0.04em;color:#fff;margin-bottom:24px;">Monday<br><span style="color:${C.muted};">Intelligence</span><br>Drop</div>
         <div style="display:flex;align-items:center;gap:10px;">
           <span style="font-family:${GM};font-size:10px;font-weight:500;letter-spacing:0.06em;color:${C.lime};background:rgba(215,230,65,0.1);border:1px solid rgba(215,230,65,0.25);padding:5px 14px;border-radius:100px;">${today}</span>
           <span style="font-family:${GM};font-size:10px;color:${C.dim};">WK ${weekNum}</span>
         </div>
       </div>
+      `:''}
 
-      ${state.phase!=='running'?`
+      ${state.phase==='idle'?`
       <div class="fu2" style="margin-bottom:28px;">
         <div style="font-family:${GM};font-size:9px;letter-spacing:0.14em;color:${C.dim};margin-bottom:12px;">ACTIVE CLIENTS — ${state.clients.length}</div>
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
@@ -1030,37 +1371,123 @@ function renderMain() {
       ${state.error?`<div style="background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.2);border-radius:8px;padding:16px 20px;font-family:${GF};font-size:13.5px;color:#f87171;margin-top:16px;line-height:1.6;"><strong>Error:</strong> ${esc(state.error)}<br><span style="font-size:12px;color:${C.dim};">Check that your API key is valid and has the Web Search tool enabled.</span></div>`:''}
 
       ${state.phase==='running'?`
-      <div class="fu">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
-          <div style="font-family:'Geist',sans-serif;font-size:22px;font-weight:700;letter-spacing:-0.03em;color:#fff;">Sweeping the web</div>
-          <div style="display:flex;gap:3px;align-items:center;padding-top:2px;">
-            ${[0,1,2].map(i=>`<div style="width:4px;height:${10+i*4}px;background:${C.blue};border-radius:2px;opacity:0.7;animation:glowPulse ${0.8+i*0.2}s ease ${i*0.15}s infinite;"></div>`).join('')}
+      <div class="fu" style="min-height:calc(100vh - 120px);display:flex;align-items:center;">
+        <div style="width:100%;display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:start;">
+          <div>
+            <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
+              <div style="font-family:'Geist',sans-serif;font-size:clamp(48px,6vw,80px);font-weight:800;letter-spacing:-0.04em;line-height:0.95;color:#fff;">Sweeping<br>the web</div>
+              <div style="display:flex;gap:3px;align-items:flex-end;padding-bottom:6px;">
+                ${[0,1,2].map(i=>`<div style="width:4px;height:${12+i*6}px;background:${C.blue};border-radius:2px;animation:glowPulse ${0.8+i*0.2}s ease ${i*0.15}s infinite;"></div>`).join('')}
+              </div>
+            </div>
+            <div style="font-family:${GF};font-size:15px;color:${C.muted};margin-bottom:32px;line-height:1.6;">Researching ${state.clients.length} clients across ${industries} industr${industries===1?'y':'ies'} via Perplexity + Claude</div>
+            ${state.liveSignals?`
+            <div style="background:rgba(0,153,255,0.05);border:1px solid rgba(0,153,255,0.12);border-radius:10px;padding:16px 20px;">
+              <div style="font-family:${GM};font-size:9px;letter-spacing:0.1em;color:${C.blue};margin-bottom:10px;">PERPLEXITY FOUND — ${[...(state.liveSignals.clientNews||[]),...(state.liveSignals.designSignals||[])].length} SOURCES</div>
+              <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                ${[...(state.liveSignals.clientNews||[]).map(n=>({label:n.company,count:1})),...(state.liveSignals.designSignals||[]).map(n=>({label:'Design',count:1}))].reduce((acc,n)=>{const ex=acc.find(a=>a.label===n.label);ex?ex.count++:acc.push({...n});return acc;},[]).map(n=>`<span style="font-family:${GM};font-size:9px;padding:2px 10px;border-radius:100px;background:rgba(0,153,255,0.08);border:1px solid rgba(0,153,255,0.15);color:rgba(255,255,255,0.5);">${esc(n.label)} <span style="color:${C.blue};">${n.count}</span></span>`).join('')}
+              </div>
+            </div>`:''}
           </div>
+          <div>${renderScanLog()}</div>
         </div>
-        <div style="font-family:${GF};font-size:13px;color:${C.muted};margin-bottom:4px;">Researching ${state.clients.length} client${state.clients.length>1?'s':''} across ${industries} industr${industries===1?'y':'ies'}</div>
-        ${renderScanLog()}
       </div>`:''}
 
       ${state.phase==='done'&&state.report?`
       <div class="fu">
-        <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;">
-          <div>
-            <div style="font-family:'Geist',sans-serif;font-size:22px;font-weight:700;letter-spacing:-0.03em;color:#fff;">This week's drop</div>
-            <div style="font-family:${GF};font-size:12px;color:${C.dim};margin-top:3px;">${sections.length} sections · ${state.liveSignals?`Perplexity + Claude · ${[...(state.liveSignals.clientNews||[]),...(state.liveSignals.designSignals||[])].length} live sources · `:'live research · '}${state.clients.length} clients</div>
+        <!-- HERO: full-viewport cover -->
+        <div style="min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding:0 48px;padding-bottom:80px;max-width:1400px;margin:0 auto;box-sizing:border-box;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-end;">
+            <div>
+              <div style="font-family:'Geist',sans-serif;font-size:clamp(64px,8vw,120px);font-weight:800;letter-spacing:-0.04em;line-height:0.88;color:#fff;">This week's<br>drop.</div>
+              <div style="display:flex;align-items:center;gap:10px;margin-top:20px;flex-wrap:wrap;">
+                <span style="font-family:${GM};font-size:10px;color:${C.lime};background:rgba(215,230,65,0.1);border:1px solid rgba(215,230,65,0.25);padding:5px 14px;border-radius:100px;">${today}</span>
+                <span style="font-family:${GM};font-size:10px;color:${C.dim};">WK ${weekNum}</span>
+                <span style="color:${C.dim};">·</span>
+                <span style="font-family:${GF};font-size:13px;color:${C.dim};">${sections.length} sections · ${state.liveSignals?`Perplexity + Claude · ${[...(state.liveSignals.clientNews||[]),...(state.liveSignals.designSignals||[])].length} live sources · `:'live research · '}${state.clients.length} clients</span>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:16px;">
+              <button id="reset-btn" class="ghost-btn" style="padding:10px 20px;background:transparent;border:1px solid ${C.border};border-radius:100px;font-family:${GM};font-size:10px;letter-spacing:0.08em;color:${C.dim};cursor:pointer;">↺ RUN AGAIN</button>
+              <div style="display:flex;align-items:center;gap:6px;opacity:0.4;">
+                <span style="font-family:${GM};font-size:10px;color:${C.dim};">SCROLL TO READ</span>
+                <span style="color:${C.dim};font-size:14px;">↓</span>
+              </div>
+            </div>
           </div>
-          <button id="reset-btn" class="ghost-btn" style="padding:8px 18px;background:transparent;border:1px solid ${C.border};border-radius:6px;font-family:${GF};font-size:12px;color:${C.dim};cursor:pointer;">↺ Run again</button>
         </div>
         ${renderSectionsWithBento(sections)}
-        ${renderSlackPreview()}
-        ${renderAutoPilot()}
-        <div style="margin-top:32px;padding-top:20px;border-top:1px solid ${C.border};display:flex;justify-content:space-between;align-items:center;">
-          <div style="font-family:${GM};font-size:10px;color:${C.dim};">Generated ${new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div>
+        </div>
+        ${renderAutoPilotSection()}
+        ${renderSlackAndAutoPilot()}
+        <div style="max-width:1400px;margin:0 auto;padding:0 48px 48px;">
+        <div style="padding-top:20px;border-top:1px solid ${C.border};display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-family:${GM};font-size:10px;color:${C.dim};">Generated ${new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})} · ${state.liveSignals?'Perplexity + Claude Sonnet':'Claude Sonnet'}</div>
           <div style="font-family:${GM};font-size:9px;font-weight:500;letter-spacing:0.1em;color:${C.dim};background:${C.surface};border:1px solid ${C.border};padding:4px 12px;border-radius:100px;">THE LAB STUDIO</div>
+        </div>
         </div>
       </div>`:''}
 
     </div>
-    ${state.showHistory?renderHistoryPanel():''}`;
+    ${state.showHistory?renderHistoryPanel():''}
+    ${state.showSettings?renderSettingsPanel():''}`;
+}
+
+// ─── SETTINGS PANEL ───────────────────────────────────────────────────────────
+function renderSettingsPanel() {
+  return `
+  <div style="position:fixed;top:0;right:0;bottom:0;width:min(440px,100vw);background:#0a0a0a;border-left:1px solid ${C.border};z-index:200;display:flex;flex-direction:column;animation:slideIn 0.3s ease forwards;">
+    <div style="padding:18px 24px;border-bottom:1px solid ${C.border};display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+      <span style="font-family:${GM};font-size:10px;font-weight:500;letter-spacing:0.14em;color:${C.dim};">⚙ SETTINGS</span>
+      <button id="close-settings" style="background:none;border:none;color:${C.dim};cursor:pointer;font-size:20px;line-height:1;">×</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:24px;">
+      <div style="font-family:${GM};font-size:8px;color:${C.dim};letter-spacing:0.12em;margin-bottom:16px;">API KEYS</div>
+
+      <div style="margin-bottom:16px;">
+        <div style="font-family:${GM};font-size:9px;color:${C.dim};letter-spacing:0.1em;margin-bottom:6px;">ANTHROPIC API KEY <span style="color:rgba(248,113,113,0.7);">REQUIRED</span></div>
+        <input id="settings-api-key" type="password" placeholder="sk-ant-api03-..." value="${esc(state.apiKey==='demo'?'':state.apiKey)}"
+          style="width:100%;padding:10px 14px;border:1px solid ${C.border};border-radius:6px;font-family:${GM};font-size:11px;background:${C.surface};color:#fff;" />
+      </div>
+
+      <div style="margin-bottom:24px;">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+          <span style="font-family:${GM};font-size:9px;color:${C.dim};letter-spacing:0.1em;">PERPLEXITY API KEY</span>
+          <span style="background:rgba(0,153,255,0.12);color:${C.blue};padding:1px 6px;border-radius:100px;font-family:${GM};font-size:7px;">OPTIONAL · ✦ ENHANCED</span>
+        </div>
+        <input id="settings-pplx-key" type="password" placeholder="pplx-..." value="${esc(state.perplexityKey)}"
+          style="width:100%;padding:10px 14px;border:1px solid rgba(0,153,255,0.2);border-radius:6px;font-family:${GM};font-size:11px;background:rgba(0,153,255,0.04);color:#fff;" />
+        <div style="font-family:${GF};font-size:11px;color:${C.dim};margin-top:6px;line-height:1.5;">Enables live web research before each drop. The agent searches for real client news, then feeds results to Claude.</div>
+      </div>
+
+      <div style="border-top:1px solid ${C.border};padding-top:20px;margin-bottom:20px;">
+        <div style="font-family:${GM};font-size:8px;color:${C.dim};letter-spacing:0.12em;margin-bottom:16px;">SLACK & DELIVERY</div>
+        <div style="margin-bottom:12px;">
+          <div style="font-family:${GM};font-size:9px;color:${C.dim};margin-bottom:6px;">SLACK WEBHOOK URL</div>
+          <input id="settings-webhook" type="text" placeholder="https://hooks.slack.com/services/..." value="${esc(state.slackWebhook)}"
+            style="width:100%;padding:10px 14px;border:1px solid ${C.border};border-radius:6px;font-family:${GM};font-size:11px;background:${C.surface};color:#fff;" />
+        </div>
+        <div>
+          <div style="font-family:${GM};font-size:9px;color:${C.dim};margin-bottom:6px;">REPORT URL</div>
+          <input id="settings-site-url" type="text" placeholder="https://monday-drop.vercel.app" value="${esc(state.siteUrl)}"
+            style="width:100%;padding:10px 14px;border:1px solid ${C.border};border-radius:6px;font-family:${GM};font-size:11px;background:${C.surface};color:#fff;" />
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button id="save-settings-btn" style="width:100%;padding:12px;background:${C.blue};color:#fff;border:none;border-radius:6px;font-family:${GF};font-size:13px;font-weight:600;cursor:pointer;">
+          Save Settings
+        </button>
+        ${!state.demoMode?`
+        <button id="reset-key-btn" style="width:100%;padding:11px;background:transparent;border:1px solid rgba(248,113,113,0.2);border-radius:6px;font-family:${GF};font-size:12px;color:rgba(248,113,113,0.6);cursor:pointer;">
+          Reset & disconnect
+        </button>`:`
+        <button id="reset-key-btn" style="width:100%;padding:11px;background:transparent;border:1px solid ${C.border};border-radius:6px;font-family:${GF};font-size:12px;color:${C.dim};cursor:pointer;">
+          Exit demo mode
+        </button>`}
+      </div>
+    </div>
+  </div>`;
 }
 
 // ─── RENDER ───────────────────────────────────────────────────────────────────
@@ -1072,8 +1499,13 @@ function render() {
 
 // ─── BINDINGS ─────────────────────────────────────────────────────────────────
 function bindSetup() {
+  document.getElementById('demo-btn')?.addEventListener('click',()=>{state.demoMode=true;state.apiKey='demo';render();});
+  document.getElementById('connect-keys-btn')?.addEventListener('click',()=>{state.showConnectKeys=true;render();bindSetup();});
+  document.getElementById('cancel-keys-btn')?.addEventListener('click',()=>{state.showConnectKeys=false;render();bindSetup();});
+
   const input=document.getElementById('api-key-input');
   const errEl=document.getElementById('api-key-error');
+  if(!input) return;
   const save=()=>{
     const key=input.value.trim();
     if(!key.startsWith('sk-ant-')){errEl.textContent='Must start with sk-ant-';errEl.style.display='block';input.style.borderColor='rgba(248,113,113,0.5)';return;}
@@ -1084,14 +1516,42 @@ function bindSetup() {
   };
   input.addEventListener('keydown',e=>{if(e.key==='Enter')save();});
   input.addEventListener('input',()=>{errEl.style.display='none';input.style.borderColor=C.border;});
-  document.getElementById('activate-btn').addEventListener('click',save);
-  document.getElementById('demo-btn').addEventListener('click',()=>{state.demoMode=true;state.apiKey='demo';render();});
+  document.getElementById('activate-btn')?.addEventListener('click',save);
 }
 
 function bindMain() {
+  // Nav color adaptation
+  const nav = document.getElementById('main-nav');
+  if (nav) {
+    const navSections = document.querySelectorAll('[data-nav-bg]');
+    if (navSections.length) {
+      const navObs = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            nav.style.background = entry.target.dataset.navBg || 'rgba(0,0,0,0.85)';
+          }
+        });
+      }, { threshold: 0.3 });
+      navSections.forEach(s => navObs.observe(s));
+    }
+  }
+
+  document.getElementById('settings-btn')?.addEventListener('click',()=>{state.showSettings=!state.showSettings;render();});
+  document.getElementById('close-settings')?.addEventListener('click',()=>{state.showSettings=false;render();});
+  document.getElementById('save-settings-btn')?.addEventListener('click',()=>{
+    const apiKey = document.getElementById('settings-api-key')?.value.trim();
+    const pplxKey = document.getElementById('settings-pplx-key')?.value.trim();
+    const webhook = document.getElementById('settings-webhook')?.value.trim();
+    const siteUrl = document.getElementById('settings-site-url')?.value.trim();
+    if(apiKey&&apiKey.startsWith('sk-ant-')){localStorage.setItem('lab_mid_key',apiKey);state.apiKey=apiKey;state.demoMode=false;}
+    if(pplxKey){localStorage.setItem('lab_pplx_key',pplxKey);state.perplexityKey=pplxKey;}
+    if(webhook&&webhook.startsWith('https://hooks.slack.com/')){localStorage.setItem('lab_slack_webhook',webhook);state.slackWebhook=webhook;}
+    if(siteUrl&&siteUrl.startsWith('http')){localStorage.setItem('lab_site_url',siteUrl);state.siteUrl=siteUrl;}
+    state.showSettings=false;render();
+  });
   document.getElementById('reset-key-btn')?.addEventListener('click',()=>{
     localStorage.removeItem('lab_mid_key');state.apiKey='';state.demoMode=false;
-    state.phase='idle';state.report='';state.step=0;state.error='';render();
+    state.phase='idle';state.report='';state.step=0;state.error='';state.showSettings=false;render();
   });
   document.querySelectorAll('.remove-client').forEach(btn=>{
     btn.addEventListener('click',()=>{state.clients=state.clients.filter(c=>c.id!==parseInt(btn.dataset.id));render();});
@@ -1106,16 +1566,25 @@ function bindMain() {
   document.getElementById('reset-btn')?.addEventListener('click',()=>{state.phase='idle';state.report='';state.step=0;state.error='';render();});
 
   // Client tabs
+  document.querySelectorAll('.client-sidebar-tab').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const idx=parseInt(btn.dataset.tab);
+      document.querySelectorAll('.client-sidebar-tab').forEach((t,i)=>{
+        const a=i===idx;
+        t.style.background=a?'rgba(255,255,255,0.04)':'transparent';
+        t.style.borderLeft=a?`2px solid ${C.lime}`:'2px solid transparent';
+        const nameEl=t.querySelector('div:first-child');
+        const indEl=t.querySelector('div:last-child');
+        if(nameEl){nameEl.style.color=a?'#fff':'rgba(255,255,255,0.3)';nameEl.style.fontWeight=a?'700':'400';}
+        if(indEl){indEl.style.color=a?'rgba(255,255,255,0.3)':'rgba(255,255,255,0.15)';}
+      });
+      document.querySelectorAll('.client-panel').forEach((p,i)=>{p.style.display=i===idx?'block':'none';});
+    });
+  });
+  // Alias for old class name
   document.querySelectorAll('.client-tab').forEach(btn=>{
     btn.addEventListener('click',()=>{
       const idx=parseInt(btn.dataset.tab);
-      document.querySelectorAll('.client-tab').forEach((t,i)=>{
-        const a=i===idx;
-        t.style.background=a?'rgba(215,230,65,0.08)':'transparent';
-        t.style.color=a?C.lime:C.dim;
-        t.style.borderColor=a?'rgba(215,230,65,0.3)':C.border;
-        t.style.fontWeight=a?'600':'400';
-      });
       document.querySelectorAll('.client-panel').forEach((p,i)=>{p.style.display=i===idx?'block':'none';});
     });
   });
@@ -1170,9 +1639,19 @@ function bindMain() {
   });
 
   // Auto-Pilot
-  document.getElementById('autopilot-toggle')?.addEventListener('click',()=>{
+  document.getElementById('autopilot-toggle')?.addEventListener('click',(e)=>{
+    e.stopPropagation();
     state.autoPilotEnabled=!state.autoPilotEnabled;
     localStorage.setItem('lab_autopilot', state.autoPilotEnabled);
+    render();
+  });
+  document.getElementById('autopilot-expand')?.addEventListener('click',(e)=>{
+    e.stopPropagation();
+    state.autoPilotExpanded=!state.autoPilotExpanded;
+    render();
+  });
+  document.getElementById('autopilot-header')?.addEventListener('click',()=>{
+    state.autoPilotExpanded=!state.autoPilotExpanded;
     render();
   });
   document.getElementById('autopilot-simulate')?.addEventListener('click',()=>{
